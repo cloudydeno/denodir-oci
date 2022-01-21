@@ -1,5 +1,5 @@
-import { ManifestOCIDescriptor, path } from "../deps.ts";
-import { sha256bytesToHex, sha256string } from "./util/digest.ts";
+import { assertEquals, ManifestOCIDescriptor, path, readableStreamFromReader } from "../deps.ts";
+import { sha256bytesToHex } from "./util/digest.ts";
 
 export class OciStore {
   public readonly rootPath = path.join(Deno.env.get('HOME') ?? '.', '.local', 'share', 'denodir-oci', 'storage');
@@ -45,6 +45,47 @@ export class OciStore {
       ...descriptor,
       digest, size,
     }
+  }
+
+  async getFullLayer(flavor: 'blob' | 'manifest', digest: string) {
+    const [digestType, digestValue] = digest.split(':');
+    assertEquals(digestType, 'sha256');
+    const layerPath = path.join(this.rootPath, `${flavor}s`, digestType, digestValue);
+
+    return await Deno.readFile(layerPath)
+      .catch(cause => {
+        if (cause instanceof Deno.errors.NotFound) throw new Deno.errors.NotFound(
+          `Local ${flavor} with digest ${digest} not found.`, { cause });
+        throw cause;
+      });
+  }
+
+  async getLayerStat(flavor: 'blob' | 'manifest', digest: string) {
+    const [digestType, digestValue] = digest.split(':');
+    const layerPath = path.join(this.rootPath, `${flavor}s`, digestType, digestValue);
+
+    return await Deno.stat(layerPath)
+      .catch(cause => {
+        if (cause instanceof Deno.errors.NotFound) throw new Deno.errors.NotFound(
+          `Local ${flavor} with digest ${digest} not found.`, { cause });
+        throw cause;
+      });
+  }
+
+  async getLayerReader(flavor: 'blob' | 'manifest', digest: string) {
+    const [digestType, digestValue] = digest.split(':');
+    const layerPath = path.join(this.rootPath, `${flavor}s`, digestType, digestValue);
+
+    return await Deno.open(layerPath, {read: true})
+      .catch(cause => {
+        if (cause instanceof Deno.errors.NotFound) throw new Deno.errors.NotFound(
+          `Local ${flavor} with digest ${digest} not found.`, { cause });
+        throw cause;
+      });
+  }
+
+  async getLayerStream(flavor: 'blob' | 'manifest', digest: string) {
+    return readableStreamFromReader(await this.getLayerReader(flavor, digest));
   }
 
 }

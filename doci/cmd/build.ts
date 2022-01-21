@@ -1,6 +1,7 @@
 import { BuildContext } from "../../lib/build.ts";
 import { defineCommand } from "../../deps.ts";
 import { OciStore } from "../../lib/store.ts";
+import { pushFullArtifact } from "../push.ts";
 
 export const buildCommand = defineCommand({
   name: 'build',
@@ -11,8 +12,21 @@ export const buildCommand = defineCommand({
     },
   },
   flags: {
-    ref: {
+    // ref: {
+    //   typeFn: String,
+    // },
+    push: {
       typeFn: String,
+      placeholder: 'reference',
+      description: "Immediately upload the built artifact to a remote registry",
+    },
+    unstable: {
+      typeFn: Boolean,
+      description: "Pass --unstable when typechecking the module",
+    },
+    skipCheck: {
+      typeFn: Boolean,
+      description: "Pass --no-check when caching the module",
     },
   },
   async run(args, flags) {
@@ -20,9 +34,13 @@ export const buildCommand = defineCommand({
     // console.log({args, flags});
     const mainMod = args.specifiers.slice(-1)[0];
 
+    const cacheFlags = [
+      ...(flags.unstable ? ['--unstable'] : []),
+      ...(flags.skipCheck ? ['--no-check'] : []),
+    ];
     { // Cache and typecheck the module before we even consider building
       const proc = Deno.run({
-        cmd: ['deno', 'cache', '--', mainMod],
+        cmd: ['deno', 'cache', ...cacheFlags, '--', mainMod],
         stdin: 'null',
       });
 
@@ -43,18 +61,26 @@ export const buildCommand = defineCommand({
         console.log('-->', 'Packing', specifier, '...');
         await ctx.addLayer(specifier, {
           baseSpecifier,
-          includeBuildInfo: specifier == mainMod,
+          includeBuildInfo: specifier == mainMod && !flags.skipCheck,
         });
         baseSpecifier = specifier;
       }
 
-      // console.log(ctx.layers.map(x => ([x.dataPath, x.descriptor?.digest])));
-
-      const finalDigest = await ctx.storeTo(store);
+      const finalDigest = await ctx.storeTo(store, {
+        builtWith: Deno.version,
+        entrypoint: ctx.layers.slice(-1)[0]?.mainSpecifier,
+        cacheFlags,
+      });
       console.log('==>', `Stored manifest`, finalDigest);
+
+      if (flags.push) {
+        console.log('-->', 'Pushing built artifact to', flags.push, '...');
+        await pushFullArtifact(store, finalDigest, flags.push);
+      }
 
     } finally {
       await Deno.remove(ctx.tempDir, { recursive: true });
     }
+
   },
 });

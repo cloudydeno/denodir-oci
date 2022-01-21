@@ -37,7 +37,7 @@ export class BuildContext {
     }));
   }
 
-  async storeTo(store: OciStore) {
+  async storeTo(store: OciStore, config: Record<string, unknown>) {
     if (this.layers.length < 1) throw new Error(
       `Need at least one layer to make a manifest`);
     if (this.layers.some(x => !x.descriptor?.digest)) throw new Error(
@@ -45,36 +45,24 @@ export class BuildContext {
 
     Object.freeze(this.layers);
 
-    this.config = {
-      builtWith: Deno.version,
-      entrypoint: this.layers.slice(-1)[0]?.mainSpecifier,
-    };
-    const configData = stableJsonStringify(this.config);
-    const configDigest = await sha256string(configData);
-    this.configBlob = {
-      digest: `sha256:${configDigest}`,
-      size: configDigest.length, // TODO: byte length
-      mediaType: "application/vnd.deno.denobox.config.v1+json",
-    };
-
-    this.manifest = {
-      schemaVersion: 2,
-      config: this.configBlob,
-      layers: this.layers.map(x => x.descriptor!),
-    };
-    const manifestData = stableJsonStringify(this.manifest);
-    const manifestDigest = await sha256string(manifestData);
-    this.manifestBlob = {
-      digest: `sha256:${manifestDigest}`,
-      size: manifestDigest.length, // TODO: byte length
-      mediaType: "application/vnd.oci.image.manifest.v1+json",
-    };
-
     for (const layer of this.layers) {
       await store.putLayerFromFile('blob', layer.descriptor!, layer.dataPath);
     }
-    await store.putLayerFromString('blob', this.configBlob, configData);
-    await store.putLayerFromString('manifest', this.manifestBlob, manifestData);
+
+    this.config = config;
+    this.configBlob = await store.putLayerFromString('blob', {
+      mediaType: "application/vnd.deno.denodir.config.v1+json",
+    }, stableJsonStringify(this.config));
+
+    this.manifest = {
+      schemaVersion: 2,
+      mediaType: "application/vnd.oci.image.manifest.v1+json",
+      config: this.configBlob,
+      layers: this.layers.map(x => x.descriptor!),
+    };
+    this.manifestBlob = await store.putLayerFromString('manifest', {
+      mediaType: this.manifest.mediaType!,
+    }, stableJsonStringify(this.manifest));
 
     return this.manifestBlob.digest;
   }
