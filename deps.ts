@@ -2,7 +2,7 @@ export {
   readAll, copy, writeAll,
   readableStreamFromReader,
 } from "https://deno.land/std@0.120.0/streams/conversion.ts";
-export { Tar } from "https://deno.land/std@0.120.0/archive/tar.ts";
+export { Tar, Untar } from "https://deno.land/std@0.120.0/archive/tar.ts";
 export { assert, assertEquals } from "https://deno.land/std@0.120.0/testing/asserts.ts";
 export * as path from "https://deno.land/std@0.120.0/path/mod.ts";
 export { Buffer } from "https://deno.land/std@0.120.0/io/buffer.ts";

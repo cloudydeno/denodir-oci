@@ -1,4 +1,11 @@
-import { assertEquals, ManifestOCIDescriptor, path, readableStreamFromReader } from "../deps.ts";
+import {
+  assertEquals,
+  copy,
+  ManifestOCIDescriptor,
+  path,
+  readableStreamFromReader,
+  Untar,
+} from "../deps.ts";
 import { sha256bytesToHex } from "./util/digest.ts";
 
 export class OciStore {
@@ -88,4 +95,49 @@ export class OciStore {
     return readableStreamFromReader(await this.getLayerReader(flavor, digest));
   }
 
+  // Is this the best location for this logic?
+  async extractLayerLocally(layer: ManifestOCIDescriptor, destFolder: string) {
+    if (!layer.mediaType.endsWith('.tar+gzip')) throw new Error(
+      `Cannot extract non-tarball layer "${layer.mediaType}"`);
+
+    const layerReader = await this.getLayerReader('blob', layer.digest);
+
+    const gunzip = Deno.run({
+      cmd: ['gzip', '--decompress'],
+      stdin: 'piped',
+      stdout: 'piped',
+    });
+
+    const toGunzipPromise = copy(layerReader, gunzip.stdin)
+      .then(size => (gunzip.stdin.close(), size));
+
+    const untar = new Untar(gunzip.stdout);
+
+    let fileCount = 0;
+    let fileSize = 0;
+    let madeDirs = new Set<string>();
+    for await (const entry of untar) {
+      // console.error(entry.fileName, entry.fileSize);
+      const fullPath = path.join(destFolder, entry.fileName);
+
+      const dirname = path.dirname(fullPath);
+      if (!madeDirs.has(dirname)) {
+        await Deno.mkdir(dirname, { recursive: true });
+        madeDirs.add(dirname);
+      }
+
+      const target = await Deno.open(fullPath, {
+        write: true, truncate: true, create: true,
+      });
+      fileSize += await copy(entry, target);
+      target.close();
+      fileCount++;
+    }
+
+    return {
+      compressedSize: await toGunzipPromise,
+      fileCount,
+      fileSize,
+    };
+  }
 }

@@ -2,6 +2,7 @@ import { komando } from "../deps.ts";
 
 import { buildCommand } from "./cmd/build.ts";
 import { pushCommand } from "./cmd/push.ts";
+import { runCommand } from "./cmd/run.ts";
 
 // https://github.com/ydcjeff/komando/commit/fea0bd01ccf934d982eea96d2728b3651ef62df9
 (Deno as any).consoleSize ??= () => ({columns: 80, rows: 24});
@@ -12,5 +13,6 @@ komando({
   commands: [
     buildCommand,
     pushCommand,
+    runCommand,
   ],
 });
