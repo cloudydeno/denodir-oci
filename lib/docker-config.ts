@@ -3,7 +3,7 @@ import { assertEquals, path, readAll, writeAll } from "../deps.ts";
 export async function readDockerConfig(): Promise<DockerConfig> {
   const filePath = path.join(Deno.env.get('HOME') ?? '.', '.docker', 'config.json');
   try {
-    return await import(filePath, { assert: { type: "json" }}).then(x => x.default);
+    return JSON.parse(await Deno.readTextFile(filePath));
   } catch (err) {
     if (err instanceof Deno.errors.NotFound) return {};
     throw err;
