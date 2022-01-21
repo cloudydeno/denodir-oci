@@ -1,7 +1,6 @@
-import { ManifestOCI, parseRepoAndRef } from "../deps.ts";
+import { forEach, ManifestOCI, parseRepoAndRef, ProgressBar } from "../deps.ts";
 import { getOciRegistry } from "../lib/registry.ts";
 import { OciStore } from "../lib/store.ts";
-import { showStreamProgress } from "./progress.ts";
 
 export async function pushFullArtifact(store: OciStore, manifestDigest: string, destination: string) {
   const manifestRaw = await store.getFullLayer('manifest', manifestDigest);
@@ -32,4 +31,16 @@ export async function pushFullArtifact(store: OciStore, manifestDigest: string, 
     ref,
   });
   console.log('==>', 'Upload complete!', resp);
+}
+
+function showStreamProgress(totalSize: number) {
+  const progressBar = new ProgressBar({
+    total: totalSize,
+  });
+
+  let bytesSoFar = 0;
+  return forEach<Uint8Array>(buffer => {
+    bytesSoFar += buffer.byteLength;
+    progressBar.render(bytesSoFar);
+  });
 }

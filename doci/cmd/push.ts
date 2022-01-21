@@ -1,6 +1,6 @@
 import { defineCommand } from "../../deps.ts";
 import { OciStore } from "../../lib/store.ts";
-import { pushFullArtifact } from "../push.ts";
+import { pushFullArtifact } from "../transfers.ts";
 
 export const pushCommand = defineCommand({
   name: 'push',
