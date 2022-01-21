@@ -1,14 +1,11 @@
 import {
-  assertEquals,
   ManifestOCIDescriptor,
-  path,
-  readAll,
   RegistryClientOpts,
   RegistryClientV2,
   RegistryHttpError,
   RegistryImage,
-  writeAll,
 } from "../deps.ts";
+import { fetchDockerCredential } from "./docker-config.ts";
 
 /** Simple API around an OCI / Docker registry. */
 export class OciRegistry {
@@ -48,56 +45,14 @@ export async function getOciRegistry(repo: RegistryImage, scopes: ['pull', 'push
     acceptOCIManifests: true,
   };
 
-  const dockerConfig = await readDockerConfig();
-  if (repo.index.name in (dockerConfig.credHelpers ?? {})) {
-    const proc = Deno.run({
-      cmd: [`docker-credential-${dockerConfig.credHelpers![repo.index.name]}`, 'get'],
-      stdin: 'piped',
-      stdout: 'piped',
-    });
-    await writeAll(proc.stdin, new TextEncoder().encode(repo.index.name));
-    proc.stdin.close();
-    const cred = JSON.parse(new TextDecoder().decode(await readAll(proc.stdout))) as {
-      Secret: string;
-      Username: string;
-    };
-    if (!cred.Username || !cred.Secret) throw new Error(`TODO: credHelpers`);
-    config.username = cred.Username;
-    config.password = cred.Secret;
-  } else {
-    for (const [server, {auth}] of Object.entries(dockerConfig.auths ?? {})) {
-      const hostname = server.includes('://') ? new URL(server).hostname : server;
-      if (hostname == repo.index.name
-          || (hostname == 'index.docker.io' && repo.index.name == 'docker.io')) {
-        const basicAuth = atob(auth).split(':');
-        assertEquals(basicAuth.length, 2);
-        config.username = basicAuth[0];
-        config.password = basicAuth[1];
-        break;
-      }
-    }
+  const credential = await fetchDockerCredential(repo.index.name);
+  if (credential) {
+    config.username = credential.Username;
+    config.password = credential.Secret;
   }
 
   console.log('   ', 'Creating OCI client for', repo.index.name,
     'as user', config.username, 'for', scopes);
   const apiClient = new RegistryClientV2(config);
   return new OciRegistry(apiClient);
-}
-
-async function readDockerConfig(): Promise<DockerConfig> {
-  const filePath = path.join(Deno.env.get('HOME') ?? '.', '.docker', 'config.json');
-  try {
-    return await import(filePath, { assert: { type: "json" }}).then(x => x.default);
-  } catch (err) {
-    if (err instanceof Deno.errors.NotFound) return {};
-    throw err;
-  }
-}
-
-interface DockerConfig {
-  auths?: Record<string, {
-    auth: string;
-    email?: string;
-  }>;
-  credHelpers?: Record<string, string>;
 }
