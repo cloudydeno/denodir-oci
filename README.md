@@ -2,7 +2,7 @@
 Upload Deno cache directories to OCI registries. Download and run on another machine, or repackage with a Deno runtime layer to make a regular Docker image.
 
 ```
-deno install -f --allow-{read,write}=$HOME,/tmp --allow-run=deno,gzip,gunzip,sha256sum,oras --allow-net --allow-env=HOME doci/mod.ts
+deno install -f --allow-{read,write}=$HOME,/tmp --allow-run --allow-net --allow-env=HOME doci/mod.ts
 ```
 
 ## Examples

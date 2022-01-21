@@ -2,10 +2,12 @@ import {
   assertEquals,
   ManifestOCIDescriptor,
   path,
+  readAll,
   RegistryClientOpts,
   RegistryClientV2,
   RegistryHttpError,
   RegistryImage,
+  writeAll,
 } from "../deps.ts";
 
 /** Simple API around an OCI / Docker registry. */
@@ -48,7 +50,20 @@ export async function getOciRegistry(repo: RegistryImage, scopes: ['pull', 'push
 
   const dockerConfig = await readDockerConfig();
   if (repo.index.name in (dockerConfig.credHelpers ?? {})) {
-    throw new Error(`TODO: credHelpers`);
+    const proc = Deno.run({
+      cmd: [`docker-credential-${dockerConfig.credHelpers![repo.index.name]}`, 'get'],
+      stdin: 'piped',
+      stdout: 'piped',
+    });
+    await writeAll(proc.stdin, new TextEncoder().encode(repo.index.name));
+    proc.stdin.close();
+    const cred = JSON.parse(new TextDecoder().decode(await readAll(proc.stdout))) as {
+      Secret: string;
+      Username: string;
+    };
+    if (!cred.Username || !cred.Secret) throw new Error(`TODO: credHelpers`);
+    config.username = cred.Username;
+    config.password = cred.Secret;
   } else {
     for (const [server, {auth}] of Object.entries(dockerConfig.auths ?? {})) {
       const hostname = server.includes('://') ? new URL(server).hostname : server;

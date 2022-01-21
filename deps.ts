@@ -1,5 +1,5 @@
 export {
-  readAll, copy,
+  readAll, copy, writeAll,
   readableStreamFromReader,
 } from "https://deno.land/std@0.121.0/streams/conversion.ts";
 export { Tar } from "https://deno.land/std@0.121.0/archive/tar.ts";
