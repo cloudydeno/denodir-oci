@@ -31,6 +31,11 @@ export class OciRegistry {
       stream: await streamFactory(),
     });
   }
+
+  async getBlobStream(digest: string) {
+    const bundle = await this.api.createBlobReadStream({digest});
+    return bundle.stream;
+  }
 }
 
 function nullIf404(err: unknown) {
@@ -51,8 +56,8 @@ export async function getOciRegistry(repo: RegistryImage, scopes: ['pull', 'push
     config.password = credential.Secret;
   }
 
-  console.log('   ', 'Creating OCI client for', repo.index.name,
-    'as user', config.username, 'for', scopes);
+  console.log('-->', 'Creating OCI client for', repo.index.name,
+    'for', scopes, 'as', config.username);
   const apiClient = new RegistryClientV2(config);
   return new OciRegistry(apiClient);
 }

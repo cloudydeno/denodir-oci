@@ -5,6 +5,7 @@ import {
   path,
   readableStreamFromReader,
   Untar,
+  writeAll,
 } from "../deps.ts";
 import { sha256bytesToHex } from "./util/digest.ts";
 
@@ -17,7 +18,11 @@ export class OciStore {
     await Deno.mkdir(path.join(this.rootPath, 'references'), {recursive: true});
   }
 
-  async putLayerFromFile(flavor: 'blob' | 'manifest', descriptor: ManifestOCIDescriptor, sourcePath: string) {
+  async putLayerFromFile(
+    flavor: 'blob' | 'manifest',
+    descriptor: ManifestOCIDescriptor,
+    sourcePath: string,
+  ) {
     const [digestType, digestValue] = descriptor.digest.split(':');
     const layerPath = path.join(this.rootPath, `${flavor}s`, digestType, digestValue);
     const layerStat = await Deno.stat(layerPath)
@@ -32,10 +37,45 @@ export class OciStore {
     return descriptor;
   }
 
-  async putLayerFromString(flavor: 'blob' | 'manifest', descriptor: Omit<ManifestOCIDescriptor, 'digest' | 'size'>, rawString: string): Promise<ManifestOCIDescriptor> {
+  async putLayerFromStream(
+    flavor: 'blob' | 'manifest',
+    descriptor: ManifestOCIDescriptor,
+    stream: ReadableStream<Uint8Array>,
+  ) {
+    const [digestType, digestValue] = descriptor.digest.split(':');
+    const layerPath = path.join(this.rootPath, `${flavor}s`, digestType, digestValue);
+
+    const target = await Deno.open(layerPath, {
+      write: true, truncate: true, create: true,
+    });
+    for await (const chunk of stream) {
+      await writeAll(target, chunk);
+    }
+    target.close();
+
+    return descriptor;
+  }
+
+  async putLayerFromString(
+    flavor: 'blob' | 'manifest',
+    descriptor: Omit<ManifestOCIDescriptor, 'digest' | 'size'> & { digest?: string },
+    rawString: string
+  ): Promise<ManifestOCIDescriptor> {
     const rawData = new TextEncoder().encode(rawString);
+    return await this.putLayerFromBytes(flavor, descriptor, rawData);
+  }
+
+  async putLayerFromBytes(
+    flavor: 'blob' | 'manifest',
+    descriptor: Omit<ManifestOCIDescriptor, 'digest' | 'size'> & { digest?: string },
+    rawData: Uint8Array
+  ): Promise<ManifestOCIDescriptor> {
     const size = rawData.byteLength;
     const digest = `sha256:${await sha256bytesToHex(rawData)}`;
+
+    if (descriptor.digest) {
+      assertEquals(digest, descriptor.digest);
+    }
 
     const [digestType, digestValue] = digest.split(':');
     const layerPath = path.join(this.rootPath, `${flavor}s`, digestType, digestValue);
@@ -54,24 +94,20 @@ export class OciStore {
     }
   }
 
+  async statLayer(flavor: 'blob' | 'manifest', digest: string) {
+    const [digestType, digestValue] = digest.split(':');
+    const layerPath = path.join(this.rootPath, `${flavor}s`, digestType, digestValue);
+
+    return await Deno.stat(layerPath)
+      .catch(err => err instanceof Deno.errors.NotFound ? null : Promise.reject(err));
+  }
+
   async getFullLayer(flavor: 'blob' | 'manifest', digest: string) {
     const [digestType, digestValue] = digest.split(':');
     assertEquals(digestType, 'sha256');
     const layerPath = path.join(this.rootPath, `${flavor}s`, digestType, digestValue);
 
     return await Deno.readFile(layerPath)
-      .catch(cause => {
-        if (cause instanceof Deno.errors.NotFound) throw new Deno.errors.NotFound(
-          `Local ${flavor} with digest ${digest} not found.`, { cause });
-        throw cause;
-      });
-  }
-
-  async getLayerStat(flavor: 'blob' | 'manifest', digest: string) {
-    const [digestType, digestValue] = digest.split(':');
-    const layerPath = path.join(this.rootPath, `${flavor}s`, digestType, digestValue);
-
-    return await Deno.stat(layerPath)
       .catch(cause => {
         if (cause instanceof Deno.errors.NotFound) throw new Deno.errors.NotFound(
           `Local ${flavor} with digest ${digest} not found.`, { cause });

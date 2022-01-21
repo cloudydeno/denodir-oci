@@ -1,6 +1,7 @@
 import { komando } from "../deps.ts";
 
 import { buildCommand } from "./cmd/build.ts";
+import { pullCommand } from "./cmd/pull.ts";
 import { pushCommand } from "./cmd/push.ts";
 import { runCommand } from "./cmd/run.ts";
 
@@ -13,6 +14,7 @@ komando({
   commands: [
     buildCommand,
     pushCommand,
+    pullCommand,
     runCommand,
   ],
 });

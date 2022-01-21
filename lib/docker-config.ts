@@ -86,6 +86,8 @@ class DockerCredentialHelper {
   }
 
   async get(serverName: string) {
+    console.error(`   `, `Asking Docker credential helper "${this.name}" about "${serverName}" ...`);
+
     const cred = await this.exec<DockerCredential>('get', serverName);
     if (!cred) return null;
 
