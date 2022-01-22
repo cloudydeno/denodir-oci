@@ -1,18 +1,14 @@
-import { readAll } from "../../deps.ts";
+import { Sha256, readableStreamFromReader } from "../../deps.ts";
 
 export async function sha256file(filePath: string) {
-  const proc = Deno.run({
-    cmd: ['sha256sum', '-z', filePath],
-    stdin: 'null',
-    stdout: 'piped',
-  });
+  // Until subtle crypto has streaming digesting, this will have to do
+  const digest = new Sha256();
 
-  const raw = await readAll(proc.stdout);
-
-  const status = await proc.status();
-  if (!status.success) throw new Error('sha256sum failed');
-
-  return new TextDecoder().decode(raw.slice(0, 64));
+  const stream = await Deno.open(filePath, { read: true });
+  for await (const chunk of readableStreamFromReader(stream)) {
+    digest.update(chunk);
+  }
+  return digest.toString();
 }
 
 export async function sha256string(message: string) {
