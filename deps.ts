@@ -14,13 +14,13 @@ export type {
   ManifestOCI, ManifestOCIDescriptor,
   RegistryImage,
   RegistryClientOpts,
-} from "https://deno.land/x/docker_registry_client@v0.3.0/index.ts";
+} from "https://deno.land/x/docker_registry_client@v0.3.1/index.ts";
 export {
   RegistryClientV2,
   RegistryHttpError,
   parseRepoAndRef,
   MEDIATYPE_OCI_MANIFEST_V1,
-} from "https://deno.land/x/docker_registry_client@v0.3.0/index.ts";
+} from "https://deno.land/x/docker_registry_client@v0.3.1/index.ts";
 
 export { komando, defineCommand } from 'https://deno.land/x/komando@v1.0.0/mod.js';
 
