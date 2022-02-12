@@ -66,6 +66,22 @@ export class BuildContext {
 
     return this.manifestBlob.digest;
   }
+
+  /** Helper to run "deno cache" and make sure it succeeds */
+  async cacheSpecifier(specifier: string, runtimeFlags?: string[]) {
+    const cacheFlags = [
+      ...(runtimeFlags?.includes('--unstable') ? ['--unstable'] : []),
+      ...(runtimeFlags?.includes('--no-check') ? ['--no-check'] : []),
+    ];
+    const proc = Deno.run({
+      cmd: ['deno', 'cache', ...cacheFlags, '--', specifier],
+      stdin: 'null',
+    });
+
+    const status = await proc.status();
+    if (!status.success) throw new Error(
+      `"deno cache" failed, exit code ${status.code}`);
+  }
 }
 
 export interface DociLayer {

@@ -31,28 +31,20 @@ export const buildCommand = defineCommand({
   },
   async run(args, flags) {
     console.log('');
-    // console.log({args, flags});
     const mainMod = args.specifiers.slice(-1)[0];
 
+    const ctx = new BuildContext();
+
+    // Cache and typecheck the module before we even consider emitting
     const cacheFlags = [
       ...(flags.unstable ? ['--unstable'] : []),
       ...(flags.skipCheck ? ['--no-check'] : []),
     ];
-    { // Cache and typecheck the module before we even consider building
-      const proc = Deno.run({
-        cmd: ['deno', 'cache', ...cacheFlags, '--', mainMod],
-        stdin: 'null',
-      });
-
-      const status = await proc.status();
-      if (!status.success) throw 'deno cache fails';
-    }
+    await ctx.cacheSpecifier(mainMod, cacheFlags);
 
     const store = new OciStore();
     await store.init();
 
-    const ctx = new BuildContext();
-    // console.log(ctx.tempDir);
     try {
 
       // Keep it simple - always stack the layers linearly
@@ -69,7 +61,7 @@ export const buildCommand = defineCommand({
       const finalDigest = await ctx.storeTo(store, {
         builtWith: Deno.version,
         entrypoint: ctx.layers.slice(-1)[0]?.mainSpecifier,
-        cacheFlags,
+        runtimeFlags: cacheFlags,
       });
       console.log('==>', `Stored manifest`, finalDigest);
 
