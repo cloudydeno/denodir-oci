@@ -2,16 +2,16 @@
 // https://github.com/opencontainers/image-spec/blob/main/image-layout.md
 
 import {
+  Buffer,
+  ManifestOCI,
   ManifestOCIDescriptor,
+  ManifestOCIIndex,
   ManifestV2, ManifestV2Descriptor,
   MEDIATYPE_MANIFEST_V2,
+  MEDIATYPE_OCI_MANIFEST_V1,
   Tar,
-  Buffer,
-ManifestOCIIndex,
-ManifestOCI,
-MEDIATYPE_OCI_MANIFEST_V1,
 } from "../deps.ts";
-import { OciStore } from "./store.ts";
+import * as OciStore from "./store.ts";
 import { sha256bytesToHex } from "./util/digest.ts";
 import { stableJsonStringify } from "./util/serialize.ts";
 
@@ -30,81 +30,19 @@ import { stableJsonStringify } from "./util/serialize.ts";
  * We'll also be able to load denodir artifact layouts eventually.
  */
 export async function exportArtifactAsArchive(opts: {
-  manifest: {
-    digest: string;
-  } | {
-    digest?: undefined;
-    config: Uint8Array | ManifestOCIDescriptor;
-    layers: Array<ManifestOCIDescriptor>;
-  };
-  stores: Array<OciStore>;
+  manifestDigest: string;
+  store: OciStore.Api;
   fullRef?: string;
   format: 'docker' | 'oci';
 }) {
-
-  // TODO: virtual OciStore that handles stacking them
-  async function getFullLayer(flavor: 'blob' | 'manifest', digest: string) {
-    let firstErr: unknown;
-    for (const store of opts.stores) {
-      try {
-        return await store.getFullLayer(flavor, digest);
-      } catch (err) {
-        if (!(err instanceof Deno.errors.NotFound)) throw err;
-        firstErr ??= err;
-      }
-    }
-    throw firstErr ?? new Deno.errors.NotFound(
-      `Local ${flavor} with digest ${digest} not found.`);
-  }
-  async function getLayerReader(flavor: 'blob' | 'manifest', digest: string) {
-    let firstErr: unknown;
-    for (const store of opts.stores) {
-      try {
-        return await store.getLayerReader(flavor, digest);
-      } catch (err) {
-        if (!(err instanceof Deno.errors.NotFound)) throw err;
-        firstErr ??= err;
-      }
-    }
-    throw firstErr ?? new Deno.errors.NotFound(
-      `Local ${flavor} with digest ${digest} not found.`);
-  }
-
 
   let configBytes: Uint8Array;
   let manifestBytes: Uint8Array;
   let manifestData: ManifestV2 | ManifestOCI;
 
-  if (opts.manifest.digest != null) {
-    manifestBytes = await getFullLayer('manifest', opts.manifest.digest);
+    manifestBytes = await opts.store.getFullLayer('manifest', opts.manifestDigest);
     manifestData = JSON.parse(new TextDecoder().decode(manifestBytes));
-    configBytes = await getFullLayer('blob', manifestData.config.digest);
-
-  } else {
-    let configDesc: ManifestV2Descriptor;
-    if (opts.manifest.config instanceof Uint8Array) {
-      configBytes = opts.manifest.config;
-      configDesc = {
-        mediaType: "application/vnd.docker.container.image.v1+json",
-        digest: `sha256:${await sha256bytesToHex(configBytes)}`,
-        size: configBytes.byteLength,
-      };
-    } else {
-      configDesc = opts.manifest.config;
-      configBytes = await getFullLayer('blob', configDesc.digest);
-    }
-
-    manifestData = {
-      schemaVersion: 2,
-      mediaType: opts.format == 'docker'
-        ? MEDIATYPE_MANIFEST_V2
-        : MEDIATYPE_OCI_MANIFEST_V1,
-      config: configDesc,
-      layers: opts.manifest.layers,
-    };
-    manifestBytes = new TextEncoder().encode(stableJsonStringify(manifestData));
-  }
-
+    configBytes = await opts.store.getFullLayer('blob', manifestData.config.digest);
 
   const tar = new Tar();
 
@@ -128,7 +66,7 @@ export async function exportArtifactAsArchive(opts: {
 
       tarManifest.Layers.push(dirname+'/layer.tar');
       tar.append(dirname+'/layer.tar', {
-        reader: await getLayerReader('blob', layer.digest),
+        reader: await opts.store.getLayerReader('blob', layer.digest),
         contentSize: layer.size,
         mtime: 0,
         fileMode: 0o444,
@@ -189,7 +127,7 @@ export async function exportArtifactAsArchive(opts: {
     // Layer blobs
     for (const layer of manifestData.layers) {
       tar.append(`blobs/${encodeDigest(layer.digest)}`, {
-        reader: await getLayerReader('blob', layer.digest),
+        reader: await opts.store.getLayerReader('blob', layer.digest),
         contentSize: layer.size,
         mtime: 0,
         fileMode: 0o444,

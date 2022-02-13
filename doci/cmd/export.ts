@@ -3,9 +3,9 @@
 
 import { defineCommand, copy } from "../../deps.ts";
 import { pullFullArtifact } from "../transfers.ts";
-import { OciStore } from "../../lib/store.ts";
 import { ejectToImage } from "../../lib/eject-to-image.ts";
 import { exportArtifactAsArchive } from "../../lib/export-archive.ts";
+import * as OciStore from "../../lib/store.ts";
 
 export const exportCommand = defineCommand({
   name: 'export',
@@ -39,30 +39,33 @@ export const exportCommand = defineCommand({
     if (flags.format !== 'docker' && flags.format !== 'oci')
       throw '--format needs to be "docker" or "oci"';
 
-    const baseStore = new OciStore('base-storage');
-    await baseStore.init();
-
-    const store = new OciStore();
-    await store.init();
-
     // Pull base manifest
-    // TODO: can skip if we already have a version of the manifest
+    // TODO: can skip pulling if we already have a version of the manifest (by digest?)
+    const baseStore = await OciStore.local('base-storage');
     const baseId = await pullFullArtifact(baseStore, flags.base);
+
+    // Inmemory store for the generated manifest
+    const storeStack = OciStore.stack({
+      writable: OciStore.inMemory(),
+      readable: [
+        await OciStore.local(),
+        baseStore,
+      ],
+    });
 
     // TODO: export without ejecting (as OCI artifact format)
     const ejected = await ejectToImage({
       baseDigest: baseId.digest,
-      baseStore: baseStore,
       dociDigest: flags.digest,
-      dociStore: store,
+      store: storeStack,
     });
 
-    console.error(`Exporting to archive...`);
+    console.error(`Exporting to archive...`, ejected.digest);
 
     const tar = await exportArtifactAsArchive({
       format: flags.format,
-      manifest: ejected,
-      stores: [baseStore, store],
+      manifestDigest: ejected.digest,
+      store: storeStack,
       fullRef: flags.tag,
     });
 

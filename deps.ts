@@ -1,6 +1,7 @@
 export {
   readAll, copy, writeAll,
   readableStreamFromReader,
+  readerFromIterable,
 } from "https://deno.land/std@0.120.0/streams/conversion.ts";
 export { Tar, Untar } from "https://deno.land/std@0.120.0/archive/tar.ts";
 export { assert, assertEquals } from "https://deno.land/std@0.120.0/testing/asserts.ts";

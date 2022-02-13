@@ -1,7 +1,5 @@
-import { ManifestOCIDescriptor } from "../deps.ts";
-import { Manifest } from "../deps.ts";
-import { ManifestOCI } from "../deps.ts";
-import { OciStore } from "./store.ts";
+import { Manifest, ManifestOCI, MEDIATYPE_OCI_MANIFEST_V1 } from "../deps.ts";
+import * as OciStore from "./store.ts";
 import { Sha256Writer } from "./util/digest.ts";
 import { gunzipReaderToWriter } from "./util/gzip.ts";
 import { stableJsonStringify } from "./util/serialize.ts";
@@ -11,16 +9,15 @@ import { stableJsonStringify } from "./util/serialize.ts";
  * results in a runnable image
  */
 export async function ejectToImage(opts: {
-  baseStore: OciStore;
+  store: OciStore.Api;
   baseDigest: string;
-  dociStore: OciStore;
   dociDigest: string;
 }) {
 
-  const manifestRaw = await opts.dociStore.getFullLayer('manifest', opts.dociDigest);
+  const manifestRaw = await opts.store.getFullLayer('manifest', opts.dociDigest);
   const manifest: ManifestOCI = JSON.parse(new TextDecoder().decode(manifestRaw));
 
-  const rawBaseMani = await opts.baseStore.getFullLayer('manifest', opts.baseDigest);
+  const rawBaseMani = await opts.store.getFullLayer('manifest', opts.baseDigest);
   const baseManifest: Manifest = JSON.parse(new TextDecoder().decode(rawBaseMani));
   if (baseManifest.mediaType !== 'application/vnd.docker.distribution.manifest.v2+json') {
     throw new Error(`TODO: weird manifest type for base`);
@@ -53,13 +50,13 @@ export async function ejectToImage(opts: {
       type: 'layers',
       diff_ids: Array<string>;
     };
-  } = JSON.parse(new TextDecoder().decode(await opts.baseStore.getFullLayer('blob', baseManifest.config.digest)));
+  } = JSON.parse(new TextDecoder().decode(await opts.store.getFullLayer('blob', baseManifest.config.digest)));
 
   // Add the DOCI layers to the Docker config
   for (const layer of manifest.layers) {
     const uncompressedHasher = new Sha256Writer();
     await gunzipReaderToWriter(
-      await opts.dociStore.getLayerReader('blob', layer.digest),
+      await opts.store.getLayerReader('blob', layer.digest),
       uncompressedHasher);
 
     const uncompressedSha256 = uncompressedHasher.toHexString();
@@ -74,8 +71,16 @@ export async function ejectToImage(opts: {
 
   baseConfig.created = new Date().toISOString();
 
-  return {
-    config: new TextEncoder().encode(stableJsonStringify(baseConfig)),
+  const configDesc = await opts.store.putLayerFromString('blob', {
+    mediaType: "application/vnd.docker.container.image.v1+json",
+  }, stableJsonStringify(baseConfig));
+
+  const manifestDesc = await opts.store.putLayerFromString('manifest', {
+    mediaType: MEDIATYPE_OCI_MANIFEST_V1,
+  }, stableJsonStringify<ManifestOCI>({
+    schemaVersion: 2,
+    mediaType: MEDIATYPE_OCI_MANIFEST_V1,
+    config: configDesc,
     layers: [
       ...baseManifest.layers,
       ...manifest.layers,
@@ -83,5 +88,7 @@ export async function ejectToImage(opts: {
     annotations: {
       'org.opencontainers.image.base.digest': opts.baseDigest,
     },
-  };
+  }));
+
+  return manifestDesc;
 }

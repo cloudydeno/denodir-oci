@@ -1,6 +1,6 @@
 import { BuildContext } from "../../lib/build.ts";
 import { defineCommand } from "../../deps.ts";
-import { OciStore } from "../../lib/store.ts";
+import * as OciStore from "../../lib/store.ts";
 import { pushFullArtifact } from "../transfers.ts";
 
 export const buildCommand = defineCommand({
@@ -42,8 +42,7 @@ export const buildCommand = defineCommand({
     ];
     await ctx.cacheSpecifier(mainMod, cacheFlags);
 
-    const store = new OciStore();
-    await store.init();
+    const store = await OciStore.local();
 
     try {
 

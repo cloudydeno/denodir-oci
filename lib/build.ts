@@ -9,7 +9,7 @@ import {
   Buffer,
   path,
 } from "../deps.ts";
-import { OciStore } from "./store.ts";
+import { OciStoreApi } from "./store/_api.ts";
 import { sha256file, sha256string } from "./util/digest.ts";
 import { gzipReaderToFile } from "./util/gzip.ts";
 import { stableJsonStringify } from "./util/serialize.ts";
@@ -40,7 +40,7 @@ export class BuildContext {
     return layer;
   }
 
-  async storeTo(store: OciStore, config: Record<string, unknown>) {
+  async storeTo(store: OciStoreApi, config: Record<string, unknown>) {
     if (this.layers.length < 1) throw new Error(
       `Need at least one layer to make a manifest`);
     if (this.layers.some(x => !x.descriptor?.digest)) throw new Error(

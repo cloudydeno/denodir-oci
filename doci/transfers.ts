@@ -6,25 +6,24 @@ import {
   parseRepoAndRef,
   ProgressBar,
 } from "../deps.ts";
-import { getOciRegistry } from "../lib/registry.ts";
-import { OciStore } from "../lib/store.ts";
+import * as OciStore from "../lib/store.ts";
 
-export async function pushFullArtifact(store: OciStore, manifestDigest: string, destination: string) {
-  const manifestRaw = await store.getFullLayer('manifest', manifestDigest);
+export async function pushFullArtifact(sourceStore: OciStore.Api, manifestDigest: string, destination: string) {
+  const manifestRaw = await sourceStore.getFullLayer('manifest', manifestDigest);
   const manifest: ManifestOCI = JSON.parse(new TextDecoder().decode(manifestRaw));
 
   var rar = parseRepoAndRef(destination);
   const ref = rar.tag ?? rar.digest;
   if (!ref) throw 'No desired tag or digest found';
 
-  const client = await getOciRegistry(rar, ['pull', 'push']);
+  const client = await OciStore.registry(rar, ['pull', 'push']);
 
   for (const layer of [manifest.config, ...manifest.layers]) {
     if (await client.hasBlob(layer.digest)) {
       console.error('   ', 'Layer', layer.digest, 'is already present on registry');
     } else {
       console.error('   ', 'Need to upload', layer.digest, '...');
-      await client.uploadBlob(layer, () => store
+      await client.uploadBlob(layer, () => sourceStore
         .getLayerStream('blob', layer.digest)
         .then(stream => stream
           .pipeThrough(showStreamProgress(layer.size))));
@@ -40,12 +39,12 @@ export async function pushFullArtifact(store: OciStore, manifestDigest: string, 
   console.error('==>', 'Upload complete!', resp.digest);
 }
 
-export async function pullFullArtifact(store: OciStore, reference: string) {
+export async function pullFullArtifact(store: OciStore.Api, reference: string) {
   var rar = parseRepoAndRef(reference);
   const ref = rar.tag ?? rar.digest;
   if (!ref) throw 'No desired tag or digest found';
 
-  const client = await getOciRegistry(rar, ['pull']);
+  const client = await OciStore.registry(rar, ['pull']);
 
   const {manifest, resp: manifestResp} = await client.api.getManifest({ ref })
   if (manifest.mediaType != MEDIATYPE_OCI_MANIFEST_V1

@@ -1,6 +1,6 @@
 import { BuildContext, DociLayer } from "../../lib/build.ts";
-import { defineCommand, Flags, parseYaml, path } from "../../deps.ts";
-import { OciStore } from "../../lib/store.ts";
+import { defineCommand, Flags, parseRepoAndRef, parseYaml, path } from "../../deps.ts";
+import * as OciStore from "../../lib/store.ts";
 import { pushFullArtifact } from "../transfers.ts";
 
 interface DociConfig {
@@ -37,8 +37,7 @@ export const buildCommand = defineCommand({
     // Cache and typecheck the module before we even consider emitting
     await ctx.cacheSpecifier(config.entrypoint.specifier, config.runtimeFlags);
 
-    const store = new OciStore();
-    await store.init();
+    const store = await OciStore.local();
 
     try {
       // Keep it simple - always stack the layers linearly

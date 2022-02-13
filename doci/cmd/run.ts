@@ -1,5 +1,5 @@
 import { assertEquals, copy, defineCommand, ManifestOCI, path, Untar } from "../../deps.ts";
-import { OciStore } from "../../lib/store.ts";
+import * as OciStore from "../../lib/store.ts";
 
 export const runCommand = defineCommand({
   name: 'run',
@@ -30,8 +30,7 @@ export const runCommand = defineCommand({
 
     const digest = flags.digest;
 
-    const store = new OciStore();
-    await store.init();
+    const store = await OciStore.local();
 
     const manifestRaw = await store.getFullLayer('manifest', digest);
     const manifest: ManifestOCI = JSON.parse(new TextDecoder().decode(manifestRaw));
