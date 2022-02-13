@@ -11,6 +11,18 @@ export async function sha256file(filePath: string) {
   return digest.toString();
 }
 
+export class Sha256Writer implements Deno.Writer {
+  // Until subtle crypto has streaming digesting, this will have to do
+  protected readonly digest = new Sha256();
+  async write(p: Uint8Array) {
+    this.digest.update(p);
+    return p.byteLength;
+  }
+  toHexString() {
+    return this.digest.toString();
+  }
+}
+
 export async function sha256string(message: string) {
   const encoder = new TextEncoder();
   const data = encoder.encode(message);

@@ -28,13 +28,17 @@ export class BuildContext {
   async addLayer(specifier: string, opts: {
     baseSpecifier?: string;
     includeBuildInfo?: boolean;
+    localFileRoot?: string;
   }) {
-    this.layers.push(await buildDenodirLayer({
+    const layer = await buildDenodirLayer({
       specifier,
       dataPath: path.join(this.tempDir, `layer-${this.layers.length+1}.tar.gz`),
       baseLayer: this.layers.find(x => x.mainSpecifier == opts.baseSpecifier),
       includeBuildInfo: opts.includeBuildInfo,
-    }));
+      localFileRoot: opts.localFileRoot,
+    });
+    this.layers.push(layer);
+    return layer;
   }
 
   async storeTo(store: OciStore, config: Record<string, unknown>) {
@@ -96,17 +100,12 @@ export interface DociLayer {
 export async function buildDenodirLayer(opts: {
   specifier: string;
   dataPath: string;
+  localFileRoot?: string;
   baseLayer?: DociLayer;
   includeBuildInfo?: boolean;
 }) {
-
-  const layer: DociLayer = {
-    dataPath: opts.dataPath,
-    // mediaType: 'application/vnd.deno.denodir.v1.tar+gzip',
-    mainSpecifier: opts.specifier,
-    baseLayer: opts.baseLayer,
-    storedSpecifiers: new Set(opts.baseLayer?.storedSpecifiers),
-  }
+  if (opts.localFileRoot && !path.isAbsolute(opts.localFileRoot)) throw new Error(
+    `When passed, localFileRoot needs to be an absolute path.`);
 
   const proc = Deno.run({
     cmd: ['deno', 'info', '--json', '--', opts.specifier],
@@ -119,7 +118,44 @@ export async function buildDenodirLayer(opts: {
 
   const data = JSON.parse(new TextDecoder().decode(raw)) as ModuleGraphJson;
 
+  const {localFileRoot} = opts;
+  function rewriteFilePath(fileSpecifier: string, opts?: {
+    targetDir?: 'deps' | 'gen';
+    fileSuffix?: string;
+  }) {
+    if (!localFileRoot) throw new Error(
+      `Need localFileRoot to process file:// modules`);
+    const rootPath = path.fromFileUrl(fileSpecifier);
+    if (!rootPath.startsWith(localFileRoot)) throw new Error(
+      `Root specifier ${fileSpecifier} wasn't underneath localFileRoot ${localFileRoot}`);
+    const subPath = path.relative(localFileRoot, rootPath);
+    const newPath = path.join('denodir', opts?.targetDir || 'deps', 'file', subPath);
+    // console.log({fileSpecifier, subPath, rootPath, newPath})
+    // fileSpecifier =
+    // console.log({fileSpecifier});
+    return {
+      virtualPath: newPath,
+      virtualSpecifier: path.toFileUrl(path.parse(rootPath).root + newPath).toString(),
+      genPath: 'denodir/gen/file/'+newPath,
+    };
+  }
+
   assertEquals(data.roots.length, 1);
+  let rootSpecifier = data.roots[0];
+  if (rootSpecifier.startsWith('file://')) {
+    const newLoc = rewriteFilePath(rootSpecifier);
+    rootSpecifier = newLoc.virtualSpecifier;
+  }
+
+  const layer: DociLayer = {
+    dataPath: opts.dataPath,
+    // mediaType: 'application/vnd.deno.denodir.v1.tar+gzip',
+    // mainSpecifier: opts.specifier,
+    mainSpecifier: rootSpecifier,
+    baseLayer: opts.baseLayer,
+    storedSpecifiers: new Set(opts.baseLayer?.storedSpecifiers),
+  }
+
   for (const module of data.modules) {
     if (!module.local) throw new Error(`Module ${module.specifier} not in local`);
     // TODO: is there a correct assert here? should we just not care about asserting this?
@@ -173,6 +209,8 @@ export async function buildDenodirLayer(opts: {
     layer.storedSpecifiers.add(module.specifier);
     // console.log(module.specifier, module.local, module.emit);
 
+    let emitPathRemap: string | null = null;
+
     if (!module.local) throw new Error(`Module ${module.specifier} not local`);
     if (module.local.startsWith(prefix)) {
       await tar.append('denodir/'+module.local.slice(prefixLength), {
@@ -184,36 +222,53 @@ export async function buildDenodirLayer(opts: {
         ...await cleanDepsMeta(module.local+'.metadata.json'),
         mtime: 0,
       });
-    } else {
-      // TODO: rewrite specifier to denodir path somehow
-      // (potentially rewrite files into https://deno/ caches?)
-      // I suppose import maps may save the day here, really
-      console.log(`WARN: file:// modules aren't really supported yet`);
-      await tar.append('denodir/deps/file/'+module.local.slice(1), {
+    } else if (module.specifier.startsWith('file://')) {
+      // Move file:// modules into /denodir/deps/file/
+      // TODO: consider rewriting file://... modules underneath https://denodir/ ?
+
+      // const rootPath = module.local.slice(1);
+      // if (!opts.localFileRoot || !rootPath.startsWith(opts.localFileRoot)) throw new Error(
+      //   `Dep specifier ${module.local} wasn't underneath localFileRoot ${opts.localFileRoot}`);
+      // const subPath = path.relative(rootPath, rootSpecifier);
+      // const newPath = path.join('denodir', 'deps', 'file', subPath);
+      // console.log(module);
+      const newLoc = rewriteFilePath(module.specifier);
+
+      // console.log(opts.localFileRoot, {rootPath, module, subPath, newPath});
+      // console.log(module.local, newLoc);
+      // Deno.exit(1);
+
+      await tar.append(newLoc.virtualPath, {
         filePath: module.local,
         mtime: 0,
       });
+
+      emitPathRemap = newLoc.genPath;
+    } else {
+      throw new Error(`Don't know how to handle local side of module: ${module.specifier}`);
     }
 
     // Only compiled artifacts have these
     if (module.emit) {
       assert(module.emit.startsWith(prefix));
-      await tar.append('denodir/'+module.emit.slice(prefixLength), {
+      const emitPath = emitPathRemap ?? `denodir/${module.emit.slice(prefixLength).replace(/\.[^.]+$/, '')}`;
+      const emitExt = path.extname(module.emit);
+
+      await tar.append(emitPath+emitExt, {
         filePath: module.emit,
         mtime: 0,
       });
       const metaPath = module.emit.replace(/\.[^.]+$/, '')+'.meta';
-      await tar.append('denodir/'+metaPath.slice(prefixLength), {
+      await tar.append(emitPath+'.meta', {
         filePath: metaPath,
         mtime: 0,
       });
 
-      if (opts.includeBuildInfo && data.roots.includes(data.redirects[module.specifier] ?? module.specifier)) {
+      if (opts.includeBuildInfo && rootSpecifier == (data.redirects[module.specifier] ?? module.specifier)) {
         const buildInfoPath = module.emit.replace(/\.[^.]+$/, '.buildinfo');
-        await tar.append('denodir/'+buildInfoPath.slice(prefixLength), {
+        await tar.append(emitPath+'.buildinfo', {
           filePath: buildInfoPath,
           mtime: 0,
-          // type: 'deno-gen',
         });
       }
     }
@@ -227,7 +282,7 @@ export async function buildDenodirLayer(opts: {
     mediaType: "application/vnd.deno.denodir.v1.tar+gzip",
     size: compressedSize,
     annotations: {
-      specifier: opts.specifier,
+      specifier: rootSpecifier,
     },
   };
 

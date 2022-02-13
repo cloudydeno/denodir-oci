@@ -1,4 +1,4 @@
-import { BuildContext } from "../../lib/build.ts";
+import { BuildContext, DociLayer } from "../../lib/build.ts";
 import { defineCommand, Flags, parseYaml, path } from "../../deps.ts";
 import { OciStore } from "../../lib/store.ts";
 import { pushFullArtifact } from "../transfers.ts";
@@ -45,21 +45,23 @@ export const buildCommand = defineCommand({
       let baseSpecifier: string | undefined = undefined;
       for (const {specifier} of config.dependencyLayers ?? []) {
         console.log('-->', 'Packing', specifier, '...');
-        await ctx.addLayer(specifier, {
+        const layer: DociLayer = await ctx.addLayer(specifier, {
           baseSpecifier,
           includeBuildInfo: false,
+          localFileRoot: path.resolve(path.dirname(flags.config)),
         });
-        baseSpecifier = specifier;
+        baseSpecifier = layer.mainSpecifier;
       }
 
-      await ctx.addLayer(config.entrypoint.specifier, {
+      const mainLayer = await ctx.addLayer(config.entrypoint.specifier, {
         baseSpecifier,
         includeBuildInfo: !config.runtimeFlags?.includes('--no-check'),
+        localFileRoot: path.resolve(path.dirname(flags.config)),
       });
 
       const finalDigest = await ctx.storeTo(store, {
         builtWith: Deno.version,
-        entrypoint: ctx.layers.slice(-1)[0]?.mainSpecifier,
+        entrypoint: mainLayer.mainSpecifier,
         runtimeFlags: config.runtimeFlags,
       });
       console.log('==>', `Stored manifest`, finalDigest);

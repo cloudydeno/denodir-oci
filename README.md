@@ -30,19 +30,19 @@ for better storage utilization after successive builds.
 
 ```sh
 # One big static module and one smaller module which changes often
-doci build --ref publish-firebase-blog \
+doci build \
   https://raw.githubusercontent.com/cloudydeno/notion-toolbox/main/object-model/mod.ts \
   https://raw.githubusercontent.com/cloudydeno/notion-toolbox/main/publish-firebase-blog/mod.ts
 
 # or, condensed:
-doci build --ref publish-firebase-blog https://raw.githubusercontent.com/cloudydeno/notion-toolbox/main/{object-model,publish-firebase-blog}/mod.ts
+doci build https://raw.githubusercontent.com/cloudydeno/notion-toolbox/main/{object-model,publish-firebase-blog}/mod.ts
 
 
 # A deps.ts for dependencies, followed by the actual entrypoint
-doci build --ref kubernetes-dns-sync \
+doci build \
   https://raw.githubusercontent.com/cloudydeno/kubernetes-dns-sync/main/src/deps.ts
   https://raw.githubusercontent.com/cloudydeno/kubernetes-dns-sync/main/src/controller/mod.ts
 
 # or, condensed:
-doci build --ref kubernetes-dns-sync https://raw.githubusercontent.com/cloudydeno/kubernetes-dns-sync/main/src/{deps,controller/mod}.ts
+doci build https://raw.githubusercontent.com/cloudydeno/kubernetes-dns-sync/main/src/{deps,controller/mod}.ts
 ```

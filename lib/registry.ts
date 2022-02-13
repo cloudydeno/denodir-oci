@@ -56,7 +56,7 @@ export async function getOciRegistry(repo: RegistryImage, scopes: ['pull', 'push
     config.password = credential.Secret;
   }
 
-  console.log('-->', 'Creating OCI client for', repo.index.name,
+  console.error('-->', 'Creating OCI client for', repo.index.name,
     'for', scopes, 'as', config.username);
   const apiClient = new RegistryClientV2(config);
   return new OciRegistry(apiClient);

@@ -1,6 +1,7 @@
 import {
   forEach,
   ManifestOCI,
+  MEDIATYPE_MANIFEST_V2,
   MEDIATYPE_OCI_MANIFEST_V1,
   parseRepoAndRef,
   ProgressBar,
@@ -20,14 +21,14 @@ export async function pushFullArtifact(store: OciStore, manifestDigest: string, 
 
   for (const layer of [manifest.config, ...manifest.layers]) {
     if (await client.hasBlob(layer.digest)) {
-      console.log('   ', 'Layer', layer.digest, 'is already present on registry');
+      console.error('   ', 'Layer', layer.digest, 'is already present on registry');
     } else {
-      console.log('   ', 'Need to upload', layer.digest, '...');
+      console.error('   ', 'Need to upload', layer.digest, '...');
       await client.uploadBlob(layer, () => store
         .getLayerStream('blob', layer.digest)
         .then(stream => stream
           .pipeThrough(showStreamProgress(layer.size))));
-      console.log('-->', 'Layer', layer.digest, 'uploaded!');
+      console.error('-->', 'Layer', layer.digest, 'uploaded!');
     }
   }
 
@@ -36,7 +37,7 @@ export async function pushFullArtifact(store: OciStore, manifestDigest: string, 
     mediaType: manifest.mediaType,
     ref,
   });
-  console.log('==>', 'Upload complete!', resp.digest);
+  console.error('==>', 'Upload complete!', resp.digest);
 }
 
 export async function pullFullArtifact(store: OciStore, reference: string) {
@@ -47,7 +48,8 @@ export async function pullFullArtifact(store: OciStore, reference: string) {
   const client = await getOciRegistry(rar, ['pull']);
 
   const {manifest, resp: manifestResp} = await client.api.getManifest({ ref })
-  if (manifest.mediaType != MEDIATYPE_OCI_MANIFEST_V1) {
+  if (manifest.mediaType != MEDIATYPE_OCI_MANIFEST_V1
+      && manifest.mediaType != MEDIATYPE_MANIFEST_V2) {
     throw new Error(`Received manifest of unsupported type "${manifest.mediaType}. Is this actually a Denodir artifact, or just a normal Docker image?`);
   }
 
@@ -62,14 +64,14 @@ export async function pullFullArtifact(store: OciStore, reference: string) {
       if (layerStat.size !== layer.size) {
         throw new Error(`Digest ${layer.digest} clashed (size: ${layerStat.size} vs ${layer.size}). This isn't supposed to happen`);
       }
-      console.log('   ', 'Layer', layer.digest, 'is already present on disk');
+      console.error('   ', 'Layer', layer.digest, 'is already present on disk');
     } else {
-      console.log('   ', 'Need to download', layer.digest, '...');
+      console.error('   ', 'Need to download', layer.digest, '...');
       await store.putLayerFromStream('blob', layer, await client
         .getBlobStream(layer.digest)
         .then(stream => stream
           .pipeThrough(showStreamProgress(layer.size))));
-      console.log('-->', 'Layer', layer.digest, 'downloaded!');
+      console.error('-->', 'Layer', layer.digest, 'downloaded!');
     }
   }
 
@@ -81,7 +83,8 @@ export async function pullFullArtifact(store: OciStore, reference: string) {
     },
   }, await manifestResp.dockerBody());
 
-  console.log('==>', 'Pull complete!', manifestDescriptor.digest);
+  console.error('==>', 'Pull complete!', manifestDescriptor.digest);
+  return manifestDescriptor;
 }
 
 function showStreamProgress(totalSize: number) {

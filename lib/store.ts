@@ -10,12 +10,20 @@ import {
 import { sha256bytesToHex } from "./util/digest.ts";
 
 export class OciStore {
-  public readonly rootPath = path.join(Deno.env.get('HOME') ?? '.', '.local', 'share', 'denodir-oci', 'storage');
+  constructor(
+    readonly identifier = 'storage',
+  ) {
+    this.rootPath = path.join(
+      Deno.env.get('HOME') ?? '.',
+      '.local', 'share', 'denodir-oci',
+      this.identifier);
+  }
+  public readonly rootPath: string;
 
   async init() {
     await Deno.mkdir(path.join(this.rootPath, 'blobs', 'sha256'), {recursive: true});
     await Deno.mkdir(path.join(this.rootPath, 'manifests', 'sha256'), {recursive: true});
-    await Deno.mkdir(path.join(this.rootPath, 'references'), {recursive: true});
+    // await Deno.mkdir(path.join(this.rootPath, 'references'), {recursive: true});
   }
 
   async putLayerFromFile(
