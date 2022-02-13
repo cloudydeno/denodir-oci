@@ -22,12 +22,15 @@ export async function gzipReaderToFile(reader: Deno.Reader, targetPath: string) 
   ]);
 
   const ratio = (rawSize - compressedSize) / rawSize;
-  console.log('   ',
+  console.error('   ',
     'gzipped', Math.round(rawSize/1024), 'KiB',
     'to', Math.round(compressedSize/1024), 'KiB',
     `-`, Math.round(ratio*10000)/100, '% smaller');
 
-  return compressedSize;
+  return {
+    rawSize,
+    compressedSize,
+  };
 }
 
 export async function gunzipReaderToWriter(reader: Deno.Reader, target: Deno.Writer) {
@@ -46,4 +49,9 @@ export async function gunzipReaderToWriter(reader: Deno.Reader, target: Deno.Wri
       .then(size => (gunzip.stdin.close(), size)),
     copy(gunzip.stdout, target),
   ]);
+
+  return {
+    compressedSize,
+    decompressedSize,
+  }
 }

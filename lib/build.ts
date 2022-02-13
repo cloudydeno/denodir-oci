@@ -6,7 +6,6 @@ import {
   assertEquals,
   Tar,
   assert,
-  copy,
   Buffer,
   path,
 } from "../deps.ts";
@@ -234,10 +233,6 @@ export async function buildDenodirLayer(opts: {
       // console.log(module);
       const newLoc = rewriteFilePath(module.specifier);
 
-      // console.log(opts.localFileRoot, {rootPath, module, subPath, newPath});
-      // console.log(module.local, newLoc);
-      // Deno.exit(1);
-
       await tar.append(newLoc.virtualPath, {
         filePath: module.local,
         mtime: 0,
@@ -274,7 +269,7 @@ export async function buildDenodirLayer(opts: {
     }
   }
 
-  const compressedSize = await gzipReaderToFile(tar.getReader(), layer.dataPath);
+  const { compressedSize } = await gzipReaderToFile(tar.getReader(), layer.dataPath);
   const shaSum = await sha256file(layer.dataPath);
 
   layer.descriptor = {
