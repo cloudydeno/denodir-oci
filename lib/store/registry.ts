@@ -29,7 +29,6 @@ export class OciRegistry implements OciStoreApi {
     await this.api.blobUpload({
       digest: layer.digest,
       contentLength: layer.size,
-      contentType: layer.mediaType,
       stream: await streamFactory(),
     });
   }
