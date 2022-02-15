@@ -1,16 +1,14 @@
-import { BuildContext, DociLayer } from "../../lib/build.ts";
 import {
   defineCommand,
-  ManifestOCIIndex,
   parseRepoAndRef,
   parseYaml,
   path,
-  MEDIATYPE_OCI_MANIFEST_INDEX_V1,
 } from "../../deps.ts";
+
+import { BuildContext, DociLayer } from "../../lib/build.ts";
 import * as OciStore from "../../lib/store.ts";
 import { pushFullArtifact } from "../transfers.ts";
 import { ejectToImage } from "../../lib/eject-to-image.ts";
-import { stableJsonStringify } from "../../lib/util/serialize.ts";
 
 interface DociConfig {
   entrypoint: {
@@ -161,45 +159,14 @@ export const pushCommand = defineCommand({
       }
     }
 
-    if (manifest.mediaType == 'application/vnd.oci.image.index.v1+json' || manifest.mediaType == 'application/vnd.docker.distribution.manifest.list.v2+json') {
+    const ejected = await ejectToImage({
+      baseDigest: manifestDigest,
+      dociDigest: knownDigest,
+      store: storeStack,
+      annotations,
+    });
 
-      const newList: ManifestOCIIndex = {
-        schemaVersion: 2,
-        mediaType: 'application/vnd.oci.image.index.v1+json',
-        manifests: await Promise.all(manifest.manifests.map(async archManifest => {
-
-          const ejected = await ejectToImage({
-            baseDigest: archManifest.digest,
-            dociDigest: knownDigest,
-            store: storeStack,
-            annotations,
-          });
-
-          return {
-            ...archManifest,
-            ...ejected,
-          };
-
-        })),
-        annotations,
-      };
-
-      const listDesc = await storeStack.putLayerFromString('manifest', {
-        mediaType: MEDIATYPE_OCI_MANIFEST_INDEX_V1,
-      }, stableJsonStringify(newList));
-
-      await pushFullArtifact(storeStack, listDesc.digest, args.target);
-
-    } else {
-      const ejected = await ejectToImage({
-        baseDigest: manifestDigest,
-        dociDigest: knownDigest,
-        store: storeStack,
-        annotations,
-      });
-
-      await pushFullArtifact(storeStack, ejected.digest, args.target);
-    }
+    await pushFullArtifact(storeStack, ejected.digest, args.target);
   },
 });
 

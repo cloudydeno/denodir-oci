@@ -26,6 +26,7 @@ export {
   MEDIATYPE_OCI_MANIFEST_V1,
   MEDIATYPE_OCI_MANIFEST_INDEX_V1,
   MEDIATYPE_MANIFEST_V2,
+  MEDIATYPE_MANIFEST_LIST_V2,
 } from "https://deno.land/x/docker_registry_client@v0.3.3/index.ts";
 
 export { komando, defineCommand } from "https://deno.land/x/komando@v1.0.1/mod.js";

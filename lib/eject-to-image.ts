@@ -1,4 +1,13 @@
-import { Manifest, ManifestOCI, MEDIATYPE_OCI_MANIFEST_V1 } from "../deps.ts";
+import {
+  Manifest,
+  ManifestOCI,
+  ManifestOCIIndex,
+  MEDIATYPE_MANIFEST_LIST_V2,
+  MEDIATYPE_MANIFEST_V2,
+  MEDIATYPE_OCI_MANIFEST_INDEX_V1,
+  MEDIATYPE_OCI_MANIFEST_V1,
+} from "../deps.ts";
+
 import * as OciStore from "./store.ts";
 import { Sha256Writer } from "./util/digest.ts";
 import { gunzipReaderToWriter } from "./util/gzip.ts";
@@ -15,43 +24,38 @@ export async function ejectToImage(opts: {
   annotations?: Record<string, string>;
 }) {
 
+  const rawBaseMani = await opts.store.getFullLayer('manifest', opts.baseDigest);
+  const baseManifest: Manifest = JSON.parse(new TextDecoder().decode(rawBaseMani));
+
+  // When given a multi-arch manifest, produce a multi-arch manifest as well
+  if (baseManifest.mediaType == MEDIATYPE_OCI_MANIFEST_INDEX_V1
+    || baseManifest.mediaType == MEDIATYPE_MANIFEST_LIST_V2) {
+
+    const newList: ManifestOCIIndex = {
+      schemaVersion: 2,
+      mediaType: MEDIATYPE_OCI_MANIFEST_INDEX_V1,
+      annotations: opts.annotations,
+      manifests: await Promise.all(baseManifest.manifests
+        .map(archManifest =>
+          ejectToImage({ ...opts,
+            baseDigest: archManifest.digest,
+          }).then(ejected => ({ ...archManifest, ...ejected }))
+        )),
+    };
+
+    return await opts.store.putLayerFromString('manifest', {
+      mediaType: MEDIATYPE_OCI_MANIFEST_INDEX_V1,
+    }, stableJsonStringify(newList));
+
+  } else if (baseManifest.mediaType !== MEDIATYPE_MANIFEST_V2
+   && baseManifest.mediaType !== MEDIATYPE_OCI_MANIFEST_V1) {
+    throw new Error(`Base manifest at ${opts.baseDigest} has unsupported mediaType`);
+  }
+
   const manifestRaw = await opts.store.getFullLayer('manifest', opts.dociDigest);
   const manifest: ManifestOCI = JSON.parse(new TextDecoder().decode(manifestRaw));
 
-  const rawBaseMani = await opts.store.getFullLayer('manifest', opts.baseDigest);
-  const baseManifest: Manifest = JSON.parse(new TextDecoder().decode(rawBaseMani));
-  if (baseManifest.mediaType !== 'application/vnd.docker.distribution.manifest.v2+json') {
-    throw new Error(`TODO: weird manifest type for base`);
-  }
-
-  const baseConfig: {
-    architecture: string;
-    config: Record<string, unknown> & {
-      Env: Array<string>;
-      Cmd: Array<string>;
-      Entrypoint: Array<string>;
-    };
-    container?: string;
-    container_config?: Record<string, unknown>;
-    created?: string; // 2022-02-04T02:07:57.258877599Z
-    docker_version?: string;
-    history?: Array<{
-      created: string; // 2022-01-26T01:42:33.419780362Z
-      // '/bin/sh -c #(nop)  ENTRYPOINT ["/tini" "--" "docker-entrypoint.sh"]'
-      // "/bin/sh -c #(nop)  ENV DENO_VERSION=1.18.2",
-      // "/bin/sh -c #(nop) ADD file:ca1682d5ead8dac405b02e4fb8281ffcc95bee5b63f69e7bafca35359765ad90 in / "
-      // "/bin/sh -c chmod 755 /usr/local/bin/docker-entrypoint.sh"
-      created_by: string;
-      empty_layer?: true;
-      author?: string;
-      comment?: string;
-    }>;
-    os: string;
-    rootfs: {
-      type: 'layers',
-      diff_ids: Array<string>;
-    };
-  } = JSON.parse(new TextDecoder().decode(await opts.store.getFullLayer('blob', baseManifest.config.digest)));
+  const baseConfig: OciImageConfig = JSON.parse(new TextDecoder().decode(await opts.store.getFullLayer('blob', baseManifest.config.digest)));
 
   // Add the DOCI layers to the Docker config
   for (const layer of manifest.layers) {
@@ -73,7 +77,7 @@ export async function ejectToImage(opts: {
   baseConfig.created = new Date().toISOString();
 
   const configDesc = await opts.store.putLayerFromString('blob', {
-    mediaType: "application/vnd.docker.container.image.v1+json",
+    mediaType: "application/vnd.oci.image.config.v1+json",
   }, stableJsonStringify(baseConfig));
 
   const manifestDesc = await opts.store.putLayerFromString('manifest', {
@@ -94,3 +98,32 @@ export async function ejectToImage(opts: {
 
   return manifestDesc;
 }
+
+interface OciImageConfig {
+  architecture: string;
+  config: Record<string, unknown> & {
+    Env: Array<string>;
+    Cmd: Array<string>;
+    Entrypoint: Array<string>;
+  };
+  container?: string;
+  container_config?: Record<string, unknown>;
+  created?: string;
+  docker_version?: string;
+  history?: Array<{
+    created: string;
+    // '/bin/sh -c #(nop)  ENTRYPOINT ["/tini" "--" "docker-entrypoint.sh"]'
+    // "/bin/sh -c #(nop)  ENV DENO_VERSION=1.18.2",
+    // "/bin/sh -c #(nop) ADD file:ca1682d5ead8dac405b02e4fb8281ffcc95bee5b63f69e7bafca35359765ad90 in / "
+    // "/bin/sh -c chmod 755 /usr/local/bin/docker-entrypoint.sh"
+    created_by: string;
+    empty_layer?: true;
+    author?: string;
+    comment?: string;
+  }>;
+  os: string;
+  rootfs: {
+    type: 'layers',
+    diff_ids: Array<string>;
+  };
+};
