@@ -8,6 +8,7 @@ import {
   MEDIATYPE_OCI_MANIFEST_V1,
 } from "../deps.ts";
 
+import type { DenodirArtifactConfig, OciImageConfig } from "./types.ts";
 import * as OciStore from "./store.ts";
 import { Sha256Writer } from "./util/digest.ts";
 import { gunzipReaderToWriter } from "./util/gzip.ts";
@@ -52,13 +53,26 @@ export async function ejectToImage(opts: {
     throw new Error(`Base manifest at ${opts.baseDigest} has unsupported mediaType`);
   }
 
-  const manifestRaw = await opts.store.getFullLayer('manifest', opts.dociDigest);
-  const manifest: ManifestOCI = JSON.parse(new TextDecoder().decode(manifestRaw));
+  const dociManifestRaw = await opts.store.getFullLayer('manifest', opts.dociDigest);
+  const dociManifest: ManifestOCI = JSON.parse(new TextDecoder().decode(dociManifestRaw));
 
   const baseConfig: OciImageConfig = JSON.parse(new TextDecoder().decode(await opts.store.getFullLayer('blob', baseManifest.config.digest)));
+  const dociConfig: DenodirArtifactConfig = JSON.parse(new TextDecoder().decode(await opts.store.getFullLayer('blob', dociManifest.config.digest)));
+
+  const knownDenodir = baseConfig.config.Env.find(x => x.startsWith('DENO_DIR='));
+  if (knownDenodir !== 'DENO_DIR=/denodir') {
+    baseConfig.config.Env = baseConfig.config.Env.filter(x => !x.startsWith('DENO_DIR='));
+    baseConfig.config.Env.push(`DENO_DIR=/denodir`);
+    baseConfig.history?.push({
+      empty_layer: true,
+      created: new Date().toISOString(),
+      created_by: "ENV DENO_DIR=/denodir",
+      comment: `Ejected from denodir-oci`,
+    });
+  }
 
   // Add the DOCI layers to the Docker config
-  for (const layer of manifest.layers) {
+  for (const layer of dociManifest.layers) {
     const uncompressedHasher = new Sha256Writer();
     await gunzipReaderToWriter(
       await opts.store.getLayerReader('blob', layer.digest),
@@ -68,11 +82,24 @@ export async function ejectToImage(opts: {
 
     baseConfig.history?.push({
       created: new Date().toISOString(),
-      created_by: `deno cache ${layer.annotations?.['specifier'].replace('file:///denodir/deps/file/', '') ?? '[...]'}`,
-      comment: `Ejected from denodir-oci`,
+      created_by: `RUN deno cache ${layer.annotations?.['specifier'].replace('file:///denodir/deps/file/', '') ?? '[...]'}`,
+      comment: `cloudydeno.denodir-oci.v0`,
     });
     baseConfig.rootfs.diff_ids.push(`sha256:${uncompressedSha256}`);
   }
+
+  baseConfig.config.Cmd = [
+    `deno`, `run`,
+    `--cached-only`,
+    ...dociConfig.runtimeFlags,
+    dociConfig.entrypoint,
+  ];
+  baseConfig.history?.push({
+    empty_layer: true,
+    created: new Date().toISOString(),
+    created_by: `CMD [${baseConfig.config.Cmd.map(x => JSON.stringify(x)).join(' ')}]`,
+    comment: `Ejected from denodir-oci`,
+  });
 
   baseConfig.created = new Date().toISOString();
 
@@ -88,7 +115,7 @@ export async function ejectToImage(opts: {
     config: configDesc,
     layers: [
       ...baseManifest.layers,
-      ...manifest.layers,
+      ...dociManifest.layers,
     ],
     annotations: {
       ...opts.annotations,
@@ -98,32 +125,3 @@ export async function ejectToImage(opts: {
 
   return manifestDesc;
 }
-
-interface OciImageConfig {
-  architecture: string;
-  config: Record<string, unknown> & {
-    Env: Array<string>;
-    Cmd: Array<string>;
-    Entrypoint: Array<string>;
-  };
-  container?: string;
-  container_config?: Record<string, unknown>;
-  created?: string;
-  docker_version?: string;
-  history?: Array<{
-    created: string;
-    // '/bin/sh -c #(nop)  ENTRYPOINT ["/tini" "--" "docker-entrypoint.sh"]'
-    // "/bin/sh -c #(nop)  ENV DENO_VERSION=1.18.2",
-    // "/bin/sh -c #(nop) ADD file:ca1682d5ead8dac405b02e4fb8281ffcc95bee5b63f69e7bafca35359765ad90 in / "
-    // "/bin/sh -c chmod 755 /usr/local/bin/docker-entrypoint.sh"
-    created_by: string;
-    empty_layer?: true;
-    author?: string;
-    comment?: string;
-  }>;
-  os: string;
-  rootfs: {
-    type: 'layers',
-    diff_ids: Array<string>;
-  };
-};
