@@ -12,6 +12,7 @@ export async function ejectToImage(opts: {
   store: OciStore.Api;
   baseDigest: string;
   dociDigest: string;
+  annotations?: Record<string, string>;
 }) {
 
   const manifestRaw = await opts.store.getFullLayer('manifest', opts.dociDigest);
@@ -86,6 +87,7 @@ export async function ejectToImage(opts: {
       ...manifest.layers,
     ],
     annotations: {
+      ...opts.annotations,
       'org.opencontainers.image.base.digest': opts.baseDigest,
     },
   }));

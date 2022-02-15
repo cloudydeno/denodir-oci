@@ -1,16 +1,19 @@
 import {
   forEach,
   ManifestOCI,
+  ManifestOCIIndex,
   MEDIATYPE_MANIFEST_V2,
   MEDIATYPE_OCI_MANIFEST_V1,
+  MEDIATYPE_OCI_MANIFEST_INDEX_V1,
   parseRepoAndRef,
   ProgressBar,
 } from "../deps.ts";
 import * as OciStore from "../lib/store.ts";
+import { OciRegistry } from "../lib/store/registry.ts";
 
 export async function pushFullArtifact(sourceStore: OciStore.Api, manifestDigest: string, destination: string) {
   const manifestRaw = await sourceStore.getFullLayer('manifest', manifestDigest);
-  const manifest: ManifestOCI = JSON.parse(new TextDecoder().decode(manifestRaw));
+  const manifest: ManifestOCI | ManifestOCIIndex = JSON.parse(new TextDecoder().decode(manifestRaw));
 
   var rar = parseRepoAndRef(destination);
   const ref = rar.tag ?? rar.digest;
@@ -18,12 +21,62 @@ export async function pushFullArtifact(sourceStore: OciStore.Api, manifestDigest
 
   const client = await OciStore.registry(rar, ['pull', 'push']);
 
-  for (const layer of [manifest.config, ...manifest.layers]) {
-    if (await client.hasBlob(layer.digest)) {
+  if (manifest.mediaType == 'application/vnd.oci.image.manifest.v1+json') {
+    const resp = await pushFullImage({
+      manifest,
+      manifestRaw,
+      ref,
+      sourceStore,
+      client,
+    });
+    console.error('==>', 'Image upload complete!', resp.digest);
+
+  } else if (manifest.mediaType == 'application/vnd.oci.image.index.v1+json') {
+    for (const item of manifest.manifests) {
+      const innerManifestRaw = await sourceStore.getFullLayer('manifest', item.digest);
+      const innerManifest: ManifestOCI = JSON.parse(new TextDecoder().decode(innerManifestRaw));
+
+      const resp = await pushFullImage({
+        manifest: innerManifest,
+        manifestRaw: innerManifestRaw,
+        ref: item.digest,
+        sourceStore,
+        client,
+      });
+    }
+
+    const resp = await client.api.putManifest({
+      manifestData: manifestRaw,
+      mediaType: manifest.mediaType,
+      ref: ref,
+    });
+    console.error('==>', 'Index upload complete!', resp.digest);
+
+  } else throw new Error(`Unhandled manifest mediaType ${JSON.stringify(manifest.mediaType)}`);
+}
+
+export async function pushFullImage(opts: {
+  sourceStore: OciStore.Api;
+  manifest: ManifestOCI;
+  manifestRaw: Uint8Array;
+  client: OciRegistry;
+  ref: string;
+}) {
+  // const manifestRaw = await sourceStore.getFullLayer('manifest', manifestDigest);
+  // const manifest: ManifestOCI | ManifestOCIIndex = JSON.parse(new TextDecoder().decode(manifestRaw));
+
+  // var rar = parseRepoAndRef(destination);
+  // const ref = rar.tag ?? rar.digest;
+  // if (!ref) throw 'No desired tag or digest found';
+
+  // const client = await OciStore.registry(rar, ['pull', 'push']);
+
+  for (const layer of [opts.manifest.config, ...opts.manifest.layers]) {
+    if (await opts.client.hasBlob(layer.digest)) {
       console.error('   ', 'Layer', layer.digest, 'is already present on registry');
     } else {
       console.error('   ', 'Need to upload', layer.digest, '...');
-      await client.uploadBlob(layer, () => sourceStore
+      await opts.client.uploadBlob(layer, () => opts.sourceStore
         .getLayerStream('blob', layer.digest)
         .then(stream => stream
           .pipeThrough(showStreamProgress(layer.size))));
@@ -31,12 +84,13 @@ export async function pushFullArtifact(sourceStore: OciStore.Api, manifestDigest
     }
   }
 
-  const resp = await client.api.putManifest({
-    manifestData: manifestRaw,
-    mediaType: manifest.mediaType,
-    ref,
+  const resp = await opts.client.api.putManifest({
+    manifestData: opts.manifestRaw,
+    mediaType: opts.manifest.mediaType,
+    ref: opts.ref,
   });
-  console.error('==>', 'Upload complete!', resp.digest);
+  // console.error('==>', 'Upload complete!', resp.digest);
+  return resp;
 }
 
 export async function pullFullArtifact(store: OciStore.Api, reference: string) {

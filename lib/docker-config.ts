@@ -1,4 +1,4 @@
-import { assertEquals, path, readAll, writeAll } from "../deps.ts";
+import { path, readAll, writeAll } from "../deps.ts";
 
 export async function readDockerConfig(): Promise<DockerConfig> {
   const filePath = path.join(Deno.env.get('HOME') ?? '.', '.docker', 'config.json');
@@ -39,7 +39,7 @@ export async function fetchDockerCredential(serverName: string): Promise<DockerC
     const hostname = server.includes('://') ? new URL(server).hostname : server;
     if (hostname == indexName && auth) {
       const basicAuth = atob(auth).split(':');
-      assertEquals(basicAuth.length, 2);
+      if (basicAuth.length !== 2) throw new Error(`Failed to parse basic auth for ${server}`);
       return {
         Username: basicAuth[0],
         Secret: basicAuth[1],
@@ -59,7 +59,13 @@ export interface DockerCredential {
 class DockerCredentialHelper {
   constructor(
     public readonly name: string,
-  ) {}
+    opts: {
+      log?: (message: string) => void,
+    } = {},
+  ) {
+    this.log = opts.log ?? console.error;
+  }
+  log: (message: string) => void;
 
   private async exec<T=unknown>(subcommand: string, stdin: string): Promise<T | null> {
     const proc = Deno.run({
@@ -86,7 +92,7 @@ class DockerCredentialHelper {
   }
 
   async get(serverName: string) {
-    console.error(`   `, `Asking Docker credential helper "${this.name}" about "${serverName}" ...`);
+    this.log(`Asking Docker credential helper "${this.name}" about "${serverName}" ...`);
 
     const cred = await this.exec<DockerCredential>('get', serverName);
     if (!cred) return null;

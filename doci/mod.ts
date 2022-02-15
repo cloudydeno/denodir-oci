@@ -1,4 +1,4 @@
-import { komando } from "../deps.ts";
+import { defineCommand, komando } from "../deps.ts";
 
 import { buildCommand } from "./cmd/build.ts";
 import { pullCommand } from "./cmd/pull.ts";
@@ -20,5 +20,12 @@ komando({
     runCommand,
     exportCommand,
     pipelineCommand,
+
+    defineCommand({
+      name: 'debug',
+      run() {
+        console.table(localStorage);
+      },
+    }),
   ],
 });

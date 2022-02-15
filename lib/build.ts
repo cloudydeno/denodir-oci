@@ -76,6 +76,7 @@ export class BuildContext {
       ...(runtimeFlags?.includes('--unstable') ? ['--unstable'] : []),
       ...(runtimeFlags?.includes('--no-check') ? ['--no-check'] : []),
     ];
+    console.error('+', 'deno', 'cache', ...cacheFlags, '--', specifier);
     const proc = Deno.run({
       cmd: ['deno', 'cache', ...cacheFlags, '--', specifier],
       stdin: 'null',
@@ -106,6 +107,7 @@ export async function buildDenodirLayer(opts: {
   if (opts.localFileRoot && !path.isAbsolute(opts.localFileRoot)) throw new Error(
     `When passed, localFileRoot needs to be an absolute path.`);
 
+  console.error('+', 'deno', 'info', '--json', '--', opts.specifier);
   const proc = Deno.run({
     cmd: ['deno', 'info', '--json', '--', opts.specifier],
     stdin: 'null',
