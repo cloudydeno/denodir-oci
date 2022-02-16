@@ -115,7 +115,10 @@ export async function ejectToImage(opts: {
     config: configDesc,
     layers: [
       ...baseManifest.layers,
-      ...dociManifest.layers,
+      ...dociManifest.layers.map(descriptor => ({
+        ...descriptor,
+        mediaType: 'application/vnd.oci.image.layer.v1.tar+gzip',
+      })),
     ],
     annotations: {
       ...opts.annotations,
