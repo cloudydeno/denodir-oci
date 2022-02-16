@@ -11,6 +11,7 @@ import { pushFullArtifact } from "../transfers.ts";
 import { ejectToImage } from "../../lib/eject-to-image.ts";
 
 interface DociConfig {
+  localFileRoot?: string;
   entrypoint: {
     specifier: string;
   };
@@ -41,13 +42,15 @@ export const buildCommand = defineCommand({
     const config = parseYaml(configText) as DociConfig;
 
     const ctx = new BuildContext();
-
-    // Cache and typecheck the module before we even consider emitting
-    await ctx.cacheSpecifier(config.entrypoint.specifier, config.cacheFlags);
-
-    const store = await OciStore.local();
-
     try {
+
+      // Cache and typecheck the module before we even consider emitting
+      await ctx.cacheSpecifier(config.entrypoint.specifier, config.cacheFlags);
+
+      const store = await OciStore.local();
+
+      const localFileRoot = path.resolve(path.dirname(flags.config), config.localFileRoot ?? '.');
+
       // Keep it simple - always stack the layers linearly
       let baseSpecifier: string | undefined = undefined;
       for (const {specifier} of config.dependencyLayers ?? []) {
@@ -55,7 +58,7 @@ export const buildCommand = defineCommand({
         const layer: DociLayer = await ctx.addLayer(specifier, {
           baseSpecifier,
           includeBuildInfo: false,
-          localFileRoot: path.resolve(path.dirname(flags.config)),
+          localFileRoot,
         });
         baseSpecifier = layer.mainSpecifier;
       }
@@ -64,7 +67,7 @@ export const buildCommand = defineCommand({
       const mainLayer = await ctx.addLayer(config.entrypoint.specifier, {
         baseSpecifier,
         includeBuildInfo: !config.runtimeFlags?.includes('--no-check'),
-        localFileRoot: path.resolve(path.dirname(flags.config)),
+        localFileRoot,
       });
 
       const finalDigest = await ctx.storeTo(store, {
