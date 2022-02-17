@@ -67,7 +67,7 @@ export async function ejectToImage(opts: {
       empty_layer: true,
       created: new Date().toISOString(),
       created_by: "ENV DENO_DIR=/denodir",
-      comment: `Ejected from denodir-oci`,
+      comment: `cloudydeno.denodir-oci.v0`,
     });
   }
 
@@ -88,17 +88,24 @@ export async function ejectToImage(opts: {
     baseConfig.rootfs.diff_ids.push(`sha256:${uncompressedSha256}`);
   }
 
-  baseConfig.config.Cmd = [
+  baseConfig.config.Entrypoint = [
     `deno`, `run`,
     `--cached-only`,
     ...dociConfig.runtimeFlags,
     dociConfig.entrypoint,
   ];
+  baseConfig.config.Cmd = [];
   baseConfig.history?.push({
     empty_layer: true,
     created: new Date().toISOString(),
-    created_by: `CMD [${baseConfig.config.Cmd.map(x => JSON.stringify(x)).join(' ')}]`,
-    comment: `Ejected from denodir-oci`,
+    created_by: `ENTRYPOINT [${baseConfig.config.Cmd.map(x => JSON.stringify(x)).join(' ')}]`,
+    comment: `cloudydeno.denodir-oci.v0`,
+  });
+  baseConfig.history?.push({
+    empty_layer: true,
+    created: new Date().toISOString(),
+    created_by: `CMD []`,
+    comment: `cloudydeno.denodir-oci.v0`,
   });
 
   baseConfig.created = new Date().toISOString();
