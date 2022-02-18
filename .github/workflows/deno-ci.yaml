@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request: {}
+
+jobs:
+
+  check:
+    runs-on: ubuntu-latest
+    name: Check w/ ${{ matrix.deno-version }}
+    strategy:
+      matrix:
+        deno-version:
+        - v1.17
+        - v1.18
+        - v1.19
+        - canary
+      fail-fast: false # run each branch to completion
+
+    steps:
+    - name: Checkout source
+      uses: actions/checkout@v2
+
+    - name: Use Deno ${{ matrix.deno-version }}
+      uses: denoland/setup-deno@v1
+      with:
+        deno-version: ${{ matrix.deno-version }}
+
+    # "https" cache: code from the Internet
+    - name: Cache https://
+      uses: actions/cache@v2
+      with:
+        path: ~/.cache/deno/deps/https
+        key: deno-https/v1-${{ github.sha }}
+        restore-keys: deno-https/v1-
+
+    - name: Check doci/mod.ts
+      run: time deno cache doci/mod.ts
