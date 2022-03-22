@@ -132,7 +132,7 @@ export const pushCommand = defineCommand({
 
     const ejectBase = config.ejections?.[flags.eject];
     if (!ejectBase) throw `No ejection config found for ${flags.eject}`;
-    var rar = parseRepoAndRef(ejectBase.base);
+    var rar = parseRepoAndRef(ejectBase.base.replace('$DenoVersion', Deno.version.deno));
     const ref = rar.tag ?? rar.digest;
     if (!ref) throw 'No base tag or digest found';
 

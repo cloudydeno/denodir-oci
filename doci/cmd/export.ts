@@ -17,7 +17,7 @@ export const exportCommand = defineCommand({
     },
     base: {
       typeFn: String,
-      defaultV: 'docker.io/denoland/deno:latest',
+      defaultV: 'docker.io/denoland/deno:alpine-$DenoVersion',
       description: 'Stacks the DOCI artifact over an existing Docker image (presumably containing a Deno runtime) to create a normal runnable Docker image',
     },
     format: {
@@ -42,7 +42,8 @@ export const exportCommand = defineCommand({
     // Pull base manifest
     // TODO: can skip pulling if we already have a version of the manifest (by digest?)
     const baseStore = await OciStore.local('base-storage');
-    const baseId = await pullFullArtifact(baseStore, flags.base);
+    const baseId = await pullFullArtifact(baseStore,
+      flags.base.replace('$DenoVersion', Deno.version.deno));
 
     // Inmemory store for the generated manifest
     const storeStack = OciStore.stack({
