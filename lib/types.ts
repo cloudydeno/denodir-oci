@@ -1,5 +1,5 @@
 export interface DenodirArtifactConfig {
-  builtWith: string;
+  builtWith: typeof Deno.version;
   entrypoint: string;
   runtimeFlags: Array<string>;
 };

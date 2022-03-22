@@ -9,6 +9,7 @@ import { BuildContext, DociLayer } from "../../lib/build.ts";
 import * as OciStore from "../../lib/store.ts";
 import { pushFullArtifact } from "../transfers.ts";
 import { ejectToImage } from "../../lib/eject-to-image.ts";
+import { DenodirArtifactConfig } from "../../lib/types.ts";
 
 interface DociConfig {
   localFileRoot?: string;
@@ -36,7 +37,14 @@ const commonFlags = {
 export const buildCommand = defineCommand({
   name: 'build',
   description: `Builds a local OCI artifact containing a Deno module`,
-  flags: { ...commonFlags },
+  flags: {
+    ...commonFlags,
+    output: {
+      short: 'o',
+      typeFn: String,
+      description: 'Select what is printed to stdout (options: "output")',
+    },
+  },
   async run(args, flags) {
     const configText = await Deno.readTextFile(flags.config);
     const config = parseYaml(configText) as DociConfig;
@@ -54,7 +62,7 @@ export const buildCommand = defineCommand({
       // Keep it simple - always stack the layers linearly
       let baseSpecifier: string | undefined = undefined;
       for (const {specifier} of config.dependencyLayers ?? []) {
-        console.log('-->', 'Packing', specifier, '...');
+        console.error('-->', 'Packing', specifier, '...');
         const layer: DociLayer = await ctx.addLayer(specifier, {
           baseSpecifier,
           includeBuildInfo: false,
@@ -63,19 +71,23 @@ export const buildCommand = defineCommand({
         baseSpecifier = layer.mainSpecifier;
       }
 
-      console.log('-->', 'Packing', config.entrypoint.specifier, '...');
+      console.error('-->', 'Packing', config.entrypoint.specifier, '...');
       const mainLayer = await ctx.addLayer(config.entrypoint.specifier, {
         baseSpecifier,
         includeBuildInfo: !config.runtimeFlags?.includes('--no-check'),
         localFileRoot,
       });
 
-      const finalDigest = await ctx.storeTo(store, {
+      const artifactConfig: DenodirArtifactConfig = {
         builtWith: Deno.version,
         entrypoint: mainLayer.mainSpecifier,
-        runtimeFlags: config.runtimeFlags,
-      });
-      console.log('==>', `Stored manifest`, finalDigest);
+        runtimeFlags: config.runtimeFlags ?? [],
+      };
+      const finalDigest = await ctx.storeTo(store, artifactConfig as any);
+      console.error('==>', `Stored manifest`, finalDigest);
+      if (flags.output == 'digest') {
+        console.log(finalDigest);
+      }
 
       const fullPath = path.resolve(config.entrypoint.specifier);
       localStorage.setItem(`specifier_${fullPath}`, finalDigest);
