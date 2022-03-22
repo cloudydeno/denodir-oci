@@ -51,7 +51,3 @@ Take an artifact and add its contents to your normal DENODIR,
 so you can import specifiers from it into regular Deno programs.
 
 I'm not sure what the usecase for this would be exactly.
-
-## unpack
-
-explode the raw contents of a built artifact into (a temp directory?) for inspection/debugging
