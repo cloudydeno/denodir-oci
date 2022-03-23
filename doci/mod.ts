@@ -1,3 +1,4 @@
+#!/usr/bin/env -S deno run --allow-read --allow-write --allow-net --allow-env --allow-run=deno
 import { defineCommand, komando } from "../deps.ts";
 
 import { buildCommand } from "./cmd/build.ts";

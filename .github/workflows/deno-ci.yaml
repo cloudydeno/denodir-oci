@@ -38,3 +38,9 @@ jobs:
 
     - name: Check doci/mod.ts
       run: time deno cache doci/mod.ts
+
+    - name: Build example artifacts
+      run: |
+        time ./doci/mod.ts pipeline build --config registry/examples/colors.yaml
+        time ./doci/mod.ts pipeline build --config registry/examples/flags.yaml
+        time ./doci/mod.ts pipeline build --config registry/examples/welcome.yaml
