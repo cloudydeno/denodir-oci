@@ -1,34 +1,39 @@
-import { copy } from "../../deps.ts";
+// import { readableStreamFromReader } from "../../deps.ts";
+import { forEach } from "https://deno.land/x/stream_observables@v1.2/transforms/for-each.ts"
 
-export async function gzipReaderToFile(reader: Deno.Reader, targetPath: string) {
+export interface CompressionStats {
+  rawSize: number;
+  compressedSize: number;
+  ratio: number;
+  durationMillis: number;
+}
 
-  const gzip = Deno.run({
-    cmd: ['gzip'],
-    stdin: 'piped',
-    stdout: 'piped',
-  });
+export function gzipStream(readable: ReadableStream<Uint8Array>) {
+  let rawSize = 0;
+  let compressedSize = 0;
+  const startTime = performance.now();
 
-  const target = await Deno.open(targetPath, {
-    create: true,
-    truncate: true,
-    write: true,
-  });
+  let statsOk: (stats: CompressionStats) => void;
+  const statsPromise = new Promise<CompressionStats>(ok => statsOk = ok);
 
-  const [rawSize, compressedSize] = await Promise.all([
-    copy(reader, gzip.stdin)
-      .then(size => (gzip.stdin.close(), size)),
-    copy(gzip.stdout, target)
-      .then(size => (target.close(), size)),
-  ]);
+  const compressedStream = readable
+    .pipeThrough(forEach(x => rawSize += x.byteLength))
+    .pipeThrough(new CompressionStream("gzip"))
+    .pipeThrough(forEach(x => compressedSize += x.byteLength))
+    .pipeThrough(new TransformStream<Uint8Array,Uint8Array>({
+      flush: () => statsOk({
+        rawSize,
+        compressedSize,
+        ratio: (rawSize - compressedSize) / rawSize,
+        durationMillis: performance.now() - startTime,
+      }),
+    }));
 
-  const ratio = (rawSize - compressedSize) / rawSize;
-  console.error('   ',
-    'gzipped', Math.round(rawSize/1024), 'KiB',
-    'to', Math.round(compressedSize/1024), 'KiB',
-    `-`, Math.round(ratio*10000)/100, '% smaller');
+  statsPromise.then(stats => console.error('   ',
+    'gzipped', Math.round(stats.rawSize/1024), 'KiB',
+    'to', Math.round(stats.compressedSize/1024), 'KiB',
+    `-`, Math.round(stats.ratio*10000)/100, '% smaller',
+    `- in`, stats.durationMillis, 'ms'));
 
-  return {
-    rawSize,
-    compressedSize,
-  };
+  return [compressedStream, statsPromise] as const;
 }

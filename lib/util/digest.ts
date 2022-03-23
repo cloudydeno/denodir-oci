@@ -1,10 +1,4 @@
-import { Sha256, readableStreamFromReader } from "../../deps.ts";
-import { single } from "https://deno.land/x/stream_observables@v1.2/sinks/single.ts";
-
-export async function sha256file(filePath: string) {
-  const { readable } = await Deno.open(filePath, { read: true });
-  return await sha256stream(readable);
-}
+import { Sha256, single } from "../../deps.ts";
 
 export async function sha256stream(byteStream: ReadableStream<Uint8Array>) {
   // Until subtle crypto has streaming digesting, this will have to do

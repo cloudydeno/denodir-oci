@@ -33,6 +33,7 @@ export { komando, defineCommand } from "https://deno.land/x/komando@v1.0.2/mod.j
 export type { Flags, Args } from "https://deno.land/x/komando@v1.0.2/mod.js";
 
 export { forEach } from "https://deno.land/x/stream_observables@v1.2/transforms/for-each.ts";
+export { single } from "https://deno.land/x/stream_observables@v1.2/sinks/single.ts";
 
 import ProgressBar from "https://deno.land/x/progress@v1.2.5/mod.ts";
 export { ProgressBar };

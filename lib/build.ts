@@ -8,10 +8,11 @@ import {
   assert,
   Buffer,
   path,
+  readableStreamFromReader,
 } from "../deps.ts";
 import { OciStoreApi } from "./store/_api.ts";
-import { sha256file, sha256string } from "./util/digest.ts";
-import { gzipReaderToFile } from "./util/gzip.ts";
+import { sha256stream, sha256string } from "./util/digest.ts";
+import { gzipStream } from "./util/gzip.ts";
 import { stableJsonStringify } from "./util/serialize.ts";
 
 export class BuildContext {
@@ -271,15 +272,27 @@ export async function buildDenodirLayer(opts: {
     }
   }
 
-  const { compressedSize } = await gzipReaderToFile(tar.getReader(), layer.dataPath);
-  const shaSum = await sha256file(layer.dataPath);
+  const tarStream = readableStreamFromReader(tar.getReader());
+  const targetFile = await Deno.open(layer.dataPath, {
+    create: true,
+    truncate: true,
+    write: true,
+  });
+
+  const {
+    uncompressedHash,
+    compressedHash,
+    compressionStats,
+  } = await compressAndDigestAndStore(tarStream, targetFile.writable);
 
   layer.descriptor = {
-    digest: `sha256:${shaSum}`,
+    digest: `sha256:${compressedHash}`,
     mediaType: "application/vnd.deno.denodir.v1.tar+gzip",
-    size: compressedSize,
+    size: compressionStats.compressedSize,
     annotations: {
-      specifier: rootSpecifier,
+      'specifier': rootSpecifier,
+      'uncompressed-size': compressionStats.rawSize.toString(10),
+      'uncompressed-digest': `sha256:${uncompressedHash}`,
     },
   };
 
@@ -310,5 +323,46 @@ async function cleanDepsMeta(filePath: string) {
   return {
     reader: new Buffer(cleanMeta),
     contentSize: cleanMeta.byteLength,
+  };
+}
+
+
+/**
+ * ```mermaid
+ * graph TD
+ *   TarArchive -->|sha256| RawDigest
+ *   TarArchive -->|gzip| Compressed
+ *   Compressed -->|sha256| GzipDigest
+ *   Compressed --> Filesystem
+ * ```
+ * render @ https://mermaid.live
+ */
+ export async function compressAndDigestAndStore(
+  sourceData: ReadableStream<Uint8Array>,
+  targetStream: WritableStream<Uint8Array>,
+) {
+  const [rawLeft, rawRight] = sourceData.tee();
+  const uncompressedHashPromise = sha256stream(rawLeft);
+  const [compressedData, compressionStatsPromise] = gzipStream(rawRight);
+
+  const [gzipLeft, gzipRight] = compressedData.tee();
+  const compressedHashPromise = sha256stream(gzipLeft);
+  const storagePromise = gzipRight.pipeTo(targetStream);
+
+  const [
+    uncompressedHash,
+    compressedHash,
+    compressionStats,
+  ] = await Promise.all([
+    uncompressedHashPromise,
+    compressedHashPromise,
+    compressionStatsPromise,
+    storagePromise,
+  ]);
+
+  return {
+    uncompressedHash,
+    compressedHash,
+    compressionStats,
   };
 }
