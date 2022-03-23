@@ -10,8 +10,7 @@ import {
 
 import type { DenodirArtifactConfig, OciImageConfig } from "./types.ts";
 import * as OciStore from "./store.ts";
-import { Sha256Writer } from "./util/digest.ts";
-import { gunzipReaderToWriter } from "./util/gzip.ts";
+import { sha256stream } from "./util/digest.ts";
 import { stableJsonStringify } from "./util/serialize.ts";
 import { ImageConfigWriter } from "./util/image-config.ts";
 
@@ -68,14 +67,14 @@ export async function ejectToImage(opts: {
 
   // Add the DOCI layers to the Docker config
   for (const layer of dociManifest.layers) {
-    const uncompressedHasher = new Sha256Writer();
-    await gunzipReaderToWriter(
-      await opts.store.getLayerReader('blob', layer.digest),
-      uncompressedHasher);
+    const diffDigest = layer.annotations?.['uncompressed-digest']
+      ?? await getUncompressedDigest(opts.store, layer.digest);
+    const briefSpecifier = layer.annotations?.['specifier']
+      .replace('file:///denodir/deps/file/', '');
 
     configWriter.recordDiffLayer({
-      command: `RUN deno cache ${layer.annotations?.['specifier'].replace('file:///denodir/deps/file/', '') ?? '[...]'}`,
-      diffDigest: `sha256:${uncompressedHasher.toHexString()}`,
+      command: `RUN deno cache ${briefSpecifier ?? '[...]'}`,
+      diffDigest,
     });
   }
 
@@ -111,4 +110,10 @@ export async function ejectToImage(opts: {
   }));
 
   return manifestDesc;
+}
+
+async function getUncompressedDigest(store: OciStore.Api, blobDigest: string) {
+  const blobReader = await store.getLayerStream('blob', blobDigest);
+  const decompressed = blobReader.pipeThrough(new DecompressionStream("gzip"));
+  return `sha256:${await sha256stream(decompressed)}`;
 }

@@ -32,26 +32,3 @@ export async function gzipReaderToFile(reader: Deno.Reader, targetPath: string) 
     compressedSize,
   };
 }
-
-export async function gunzipReaderToWriter(reader: Deno.Reader, target: Deno.Writer) {
-
-  const gunzip = Deno.run({
-    cmd: ['gzip', '-d'],
-    stdin: 'piped',
-    stdout: 'piped',
-  });
-
-  const [
-    compressedSize,
-    decompressedSize,
-  ] = await Promise.all([
-    copy(reader, gunzip.stdin)
-      .then(size => (gunzip.stdin.close(), size)),
-    copy(gunzip.stdout, target),
-  ]);
-
-  return {
-    compressedSize,
-    decompressedSize,
-  }
-}

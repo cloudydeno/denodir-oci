@@ -1,26 +1,32 @@
 import { Sha256, readableStreamFromReader } from "../../deps.ts";
+import { single } from "https://deno.land/x/stream_observables@v1.2/sinks/single.ts";
 
 export async function sha256file(filePath: string) {
-  // Until subtle crypto has streaming digesting, this will have to do
-  const digest = new Sha256();
-
-  const stream = await Deno.open(filePath, { read: true });
-  for await (const chunk of readableStreamFromReader(stream)) {
-    digest.update(chunk);
-  }
-  return digest.toString();
+  const { readable } = await Deno.open(filePath, { read: true });
+  return await sha256stream(readable);
 }
 
-export class Sha256Writer implements Deno.Writer {
+export async function sha256stream(byteStream: ReadableStream<Uint8Array>) {
   // Until subtle crypto has streaming digesting, this will have to do
-  protected readonly digest = new Sha256();
-  async write(p: Uint8Array) {
-    this.digest.update(p);
-    return p.byteLength;
-  }
-  toHexString() {
-    return this.digest.toString();
-  }
+  let digest: Sha256;
+
+  const hashStream = new TransformStream<Uint8Array, string>(
+    {
+      start() {
+        digest = new Sha256();
+      },
+      transform(chunk) {
+        digest.update(chunk);
+      },
+      flush(controller) {
+        controller.enqueue(digest.toString());
+      },
+    },
+    { highWaterMark: 1 },
+    { highWaterMark: 0 },
+  );
+
+  return await single(byteStream.pipeThrough(hashStream));
 }
 
 export async function sha256string(message: string) {
