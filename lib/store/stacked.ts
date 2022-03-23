@@ -40,10 +40,6 @@ export class StackedStore implements OciStoreApi {
     return await this.firstReadWithout404(store =>
       store.getFullLayer(flavor, digest));
   }
-  async getLayerReader(flavor: 'blob' | 'manifest', digest: string) {
-    return await this.firstReadWithout404(store =>
-      store.getLayerReader(flavor, digest));
-  }
   async getLayerStream(flavor: 'blob' | 'manifest', digest: string) {
     return await this.firstReadWithout404(store =>
       store.getLayerStream(flavor, digest));

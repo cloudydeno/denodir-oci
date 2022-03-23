@@ -69,9 +69,6 @@ export class OciRegistry implements OciStoreApi {
     }
     throw new Error("Method not implemented.");
   }
-  async getLayerReader(flavor: "blob"|"manifest",digest: string): Promise<Deno.Reader> {
-    return readerFromIterable(await this.getLayerStream(flavor, digest));
-  }
   async getLayerStream(flavor: "blob"|"manifest",digest: string): Promise<ReadableStream<Uint8Array>> {
     if (flavor == 'blob') {
       const bundle = await this.api.createBlobReadStream({digest});

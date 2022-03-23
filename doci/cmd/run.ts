@@ -75,7 +75,7 @@ export const runCommand = defineCommand({
         console.error(`WARN: skipping unexpected layer type "${layer.mediaType}"`);
       }
       console.error('Extracting layer', layer.digest, '...');
-      const result = await store.extractLayerLocally(layer, tempDir);
+      await store.extractLayerLocally(layer, tempDir);
       // console.error('Done with layer.', result);
     }
 

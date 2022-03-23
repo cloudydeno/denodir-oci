@@ -283,7 +283,7 @@ export async function buildDenodirLayer(opts: {
     uncompressedHash,
     compressedHash,
     compressionStats,
-  } = await compressAndDigestAndStore(tarStream, targetFile.writable);
+  } = await digestAndCompressAndDigestAndStore(tarStream, targetFile.writable);
 
   layer.descriptor = {
     digest: `sha256:${compressedHash}`,
@@ -337,7 +337,7 @@ async function cleanDepsMeta(filePath: string) {
  * ```
  * render @ https://mermaid.live
  */
- export async function compressAndDigestAndStore(
+ export async function digestAndCompressAndDigestAndStore(
   sourceData: ReadableStream<Uint8Array>,
   targetStream: WritableStream<Uint8Array>,
 ) {

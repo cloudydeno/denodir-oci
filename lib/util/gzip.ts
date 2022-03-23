@@ -1,5 +1,4 @@
-// import { readableStreamFromReader } from "../../deps.ts";
-import { forEach } from "https://deno.land/x/stream_observables@v1.2/transforms/for-each.ts"
+import { forEach } from "../../deps.ts"
 
 export interface CompressionStats {
   rawSize: number;

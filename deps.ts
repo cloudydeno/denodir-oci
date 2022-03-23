@@ -7,6 +7,7 @@ export { Tar, Untar } from "https://deno.land/std@0.130.0/archive/tar.ts";
 export { assert, assertEquals } from "https://deno.land/std@0.130.0/testing/asserts.ts";
 export * as path from "https://deno.land/std@0.130.0/path/mod.ts";
 export { Buffer } from "https://deno.land/std@0.130.0/io/buffer.ts";
+export { Buffer as StreamBuffer } from "https://deno.land/std@0.130.0/streams/buffer.ts";
 export { Sha256 } from "https://deno.land/std@0.130.0/hash/sha256.ts";
 export { parse as parseYaml } from "https://deno.land/std@0.130.0/encoding/yaml.ts";
 

@@ -34,8 +34,6 @@ export interface OciStoreApi {
 
   getFullLayer(flavor: 'blob' | 'manifest', digest: string): Promise<Uint8Array>;
 
-  getLayerReader(flavor: 'blob' | 'manifest', digest: string): Promise<Deno.Reader>;
-
   getLayerStream(flavor: 'blob' | 'manifest', digest: string): Promise<ReadableStream<Uint8Array>>;
 
   // async extractLayerLocally(layer: ManifestOCIDescriptor, destFolder: string);

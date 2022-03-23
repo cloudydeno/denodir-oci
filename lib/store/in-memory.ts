@@ -1,7 +1,6 @@
 import {
   ManifestOCIDescriptor,
-  Buffer,
-  readableStreamFromReader,
+  StreamBuffer,
   assertEquals,
 } from "../../deps.ts";
 import { OciStoreApi } from "./_api.ts";
@@ -64,13 +63,9 @@ export class OciStoreInmem implements OciStoreApi {
     if (!data) throw new Deno.errors.NotFound(`Inmem store lacks ${flavor} ${digest}`);
     return Promise.resolve(data);
   }
-  async getLayerReader(flavor: "blob"|"manifest",digest: string): Promise<Deno.Reader> {
-    const data = await this.getFullLayer(flavor, digest);
-    return new Buffer(data);
-  }
   async getLayerStream(flavor: "blob"|"manifest",digest: string): Promise<ReadableStream<Uint8Array>> {
     const data = await this.getFullLayer(flavor, digest);
-    return readableStreamFromReader(new Buffer(data));
+    return new StreamBuffer(data).readable;
   }
 
 }

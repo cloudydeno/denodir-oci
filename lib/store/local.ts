@@ -3,7 +3,7 @@ import {
   copy,
   ManifestOCIDescriptor,
   path,
-  readableStreamFromReader,
+  readerFromIterable,
   Untar,
   writeAll,
 } from "../../deps.ts";
@@ -124,11 +124,12 @@ export class OciStoreLocal implements OciStoreApi {
       });
   }
 
-  async getLayerReader(flavor: 'blob' | 'manifest', digest: string) {
+  async getLayerStream(flavor: 'blob' | 'manifest', digest: string) {
     const [digestType, digestValue] = digest.split(':');
     const layerPath = path.join(this.rootPath, `${flavor}s`, digestType, digestValue);
 
     return await Deno.open(layerPath, {read: true})
+      .then(x => x.readable)
       .catch(cause => {
         if (cause instanceof Deno.errors.NotFound) throw new Deno.errors.NotFound(
           `Local ${flavor} with digest ${digest} not found.`, { cause });
@@ -136,27 +137,14 @@ export class OciStoreLocal implements OciStoreApi {
       });
   }
 
-  async getLayerStream(flavor: 'blob' | 'manifest', digest: string) {
-    return readableStreamFromReader(await this.getLayerReader(flavor, digest));
-  }
-
   // Is this the best location for this logic?
   async extractLayerLocally(layer: ManifestOCIDescriptor, destFolder: string) {
     if (!layer.mediaType.endsWith('.tar+gzip')) throw new Error(
       `Cannot extract non-tarball layer "${layer.mediaType}"`);
 
-    const layerReader = await this.getLayerReader('blob', layer.digest);
-
-    const gunzip = Deno.run({
-      cmd: ['gzip', '--decompress'],
-      stdin: 'piped',
-      stdout: 'piped',
-    });
-
-    const toGunzipPromise = copy(layerReader, gunzip.stdin)
-      .then(size => (gunzip.stdin.close(), size));
-
-    const untar = new Untar(gunzip.stdout);
+    const layerReader = await this.getLayerStream('blob', layer.digest);
+    const unzippedStream = layerReader.pipeThrough(new DecompressionStream('gzip'));
+    const untar = new Untar(readerFromIterable(unzippedStream));
 
     let fileCount = 0;
     let fileSize = 0;
@@ -180,7 +168,6 @@ export class OciStoreLocal implements OciStoreApi {
     }
 
     return {
-      compressedSize: await toGunzipPromise,
       fileCount,
       fileSize,
     };

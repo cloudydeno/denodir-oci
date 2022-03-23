@@ -4,11 +4,9 @@
 import {
   Buffer,
   ManifestOCI,
-  ManifestOCIDescriptor,
   ManifestOCIIndex,
-  ManifestV2, ManifestV2Descriptor,
-  MEDIATYPE_MANIFEST_V2,
-  MEDIATYPE_OCI_MANIFEST_V1,
+  ManifestV2,
+  readerFromIterable,
   Tar,
 } from "../deps.ts";
 import * as OciStore from "./store.ts";
@@ -66,7 +64,7 @@ export async function exportArtifactAsArchive(opts: {
 
       tarManifest.Layers.push(dirname+'/layer.tar');
       tar.append(dirname+'/layer.tar', {
-        reader: await opts.store.getLayerReader('blob', layer.digest),
+        reader: readerFromIterable(await opts.store.getLayerStream('blob', layer.digest)),
         contentSize: layer.size,
         mtime: 0,
         fileMode: 0o444,
@@ -127,7 +125,7 @@ export async function exportArtifactAsArchive(opts: {
     // Layer blobs
     for (const layer of manifestData.layers) {
       tar.append(`blobs/${encodeDigest(layer.digest)}`, {
-        reader: await opts.store.getLayerReader('blob', layer.digest),
+        reader: readerFromIterable(await opts.store.getLayerStream('blob', layer.digest)),
         contentSize: layer.size,
         mtime: 0,
         fileMode: 0o444,
