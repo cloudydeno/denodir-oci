@@ -6,6 +6,7 @@ import {
   ManifestOCI,
   ManifestOCIIndex,
   ManifestV2,
+  readableStreamFromReader,
   readerFromIterable,
   Tar,
 } from "../deps.ts";
@@ -29,6 +30,7 @@ import { stableJsonStringify } from "./util/serialize.ts";
  */
 export async function exportArtifactAsArchive(opts: {
   manifestDigest: string;
+  destination: WritableStream<Uint8Array>;
   store: OciStore.Api;
   fullRef?: string;
   format: 'docker' | 'oci';
@@ -38,14 +40,17 @@ export async function exportArtifactAsArchive(opts: {
   let manifestBytes: Uint8Array;
   let manifestData: ManifestV2 | ManifestOCI;
 
-    manifestBytes = await opts.store.getFullLayer('manifest', opts.manifestDigest);
-    manifestData = JSON.parse(new TextDecoder().decode(manifestBytes));
-    configBytes = await opts.store.getFullLayer('blob', manifestData.config.digest);
+  manifestBytes = await opts.store.getFullLayer('manifest', opts.manifestDigest);
+  manifestData = JSON.parse(new TextDecoder().decode(manifestBytes));
+  configBytes = await opts.store.getFullLayer('blob', manifestData.config.digest);
 
   const tar = new Tar();
 
   if (opts.format === 'docker') {
-    // TODO: consider that docker format probably can't store OCI artifacts (denodirs)
+    // docker can't handle OCI artifacts (denodirs): "invalid image JSON, no RootFS key"
+    if (manifestData.config.mediaType !== "application/vnd.oci.image.config.v1+json") {
+      throw new Error(`docker cannot load non-image artifacts, either export to 'oci' format or eject the image first`);
+    }
 
     const tarManifest = {
       Config: `${encodeDigest(manifestData.config.digest)}.json`,
@@ -87,7 +92,8 @@ export async function exportArtifactAsArchive(opts: {
       }));
     }
 
-    return tar;
+    await readableStreamFromReader(tar.getReader()).pipeTo(opts.destination);
+    return;
   }
 
   if (opts.format === 'oci') {
@@ -132,21 +138,8 @@ export async function exportArtifactAsArchive(opts: {
       });
     }
 
-    // const newManifest: ManifestV2 = {
-    //   ...baseManifest,
-    //   layers: [
-    //     ...baseManifest.layers,
-    //     ...manifest.layers,
-    //   ],
-    //   config: {
-    //     mediaType: baseManifest.config.mediaType,
-    //     size: encodedConfig.byteLength,
-    //     digest: `sha256:${configDigest}`,
-    //   },
-    // };
-    // const encodedManifest = new TextEncoder().encode(JSON.stringify(newManifest));
-
-    return tar;
+    await readableStreamFromReader(tar.getReader()).pipeTo(opts.destination);
+    return;
   }
 
   throw new Error(`Unsupported export format ${opts.format}`);

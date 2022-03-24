@@ -1,2 +1,7 @@
 entrypoint:
   specifier: https://deno.land/std@0.122.0/examples/welcome.ts
+
+targets:
+  alpine:
+    ref: deno.dir/examples/welcome
+    baseRef: denoland/deno:alpine-$DenoVersion

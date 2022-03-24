@@ -1,6 +1,7 @@
 entrypoint:
   specifier: https://deno.land/std@0.122.0/examples/colors.ts
 
-ejections:
+targets:
   alpine:
-    base: denoland/deno:alpine-$DenoVersion
+    ref: deno.dir/examples/colors
+    baseRef: denoland/deno:alpine-$DenoVersion

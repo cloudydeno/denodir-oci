@@ -1,10 +1,9 @@
 import {
   ManifestOCIDescriptor,
-  readerFromIterable,
   RegistryClientOpts,
   RegistryClientV2,
   RegistryHttpError,
-  RegistryImage,
+  RegistryRepo,
 } from "../../deps.ts";
 import { fetchDockerCredential } from "../docker-config.ts";
 import { OciStoreApi } from "./_api.ts";
@@ -84,7 +83,7 @@ function nullIf404(err: unknown) {
 }
 
 
-export async function getOciRegistry(repo: RegistryImage, scopes: ['pull', 'push'] | ['pull']) {
+export async function getOciRegistry(repo: RegistryRepo, scopes: ['pull', 'push'] | ['pull']) {
   const config: RegistryClientOpts = {
     repo, scopes,
     acceptOCIManifests: true,

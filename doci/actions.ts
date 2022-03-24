@@ -1,9 +1,12 @@
-import { ManifestOCI, ManifestOCIDescriptor, path } from "../deps.ts";
+import { ManifestOCI, ManifestOCIDescriptor, parseRepoAndRef, path } from "../deps.ts";
 
 import { BuildContext, DociLayer } from "../lib/build.ts";
+import { ejectToImage } from "../lib/eject-to-image.ts";
+import { exportArtifactAsArchive } from "../lib/export-archive.ts";
 import * as OciStore from "../lib/store.ts";
 import type { DenodirArtifactConfig } from "../lib/types.ts";
 import { extractTarArchive } from "../lib/util/extract.ts";
+import { pullFullArtifact } from "./transfers.ts";
 
 export async function buildSimpleImage(opts: {
   store: OciStore.Api;
@@ -130,6 +133,93 @@ export async function runArtifact(opts: {
   if (status?.success == false) {
     Deno.exit(status.code);
   }
+}
+
+export async function exportTarArchive(opts: {
+  dociStore: OciStore.Api;
+  baseStore: OciStore.Api;
+  stagingStore: OciStore.Api;
+  digest: string;
+  baseRef: string | null;
+  targetRef: string;
+  format: 'oci' | 'docker' | 'auto';
+  targetStream: WritableStream<Uint8Array>;
+}) {
+
+  if (!opts.baseRef) {
+    console.error(`Exporting to archive...`, opts.digest);
+    await exportArtifactAsArchive({
+      format: opts.format == 'auto' ? 'oci' : opts.format,
+      destination: opts.targetStream,
+      manifestDigest: opts.digest,
+      store: opts.dociStore,
+      fullRef: opts.targetRef,
+    });
+
+  } else {
+    const {ejected, store} = await ejectArtifact({
+      ...opts,
+      baseRef: opts.baseRef,
+    });
+
+    console.error(`Exporting to archive...`, ejected.digest);
+    await exportArtifactAsArchive({
+      format: opts.format == 'auto' ? 'docker' : opts.format,
+      destination: Deno.stdout.writable,
+      manifestDigest: ejected.digest,
+      store,
+      fullRef: parseRepoAndRef(opts.targetRef).canonicalRef,
+    });
+  }
+}
+
+export async function ejectArtifact(opts: {
+  dociStore: OciStore.Api;
+  baseStore: OciStore.Api;
+  stagingStore: OciStore.Api;
+  digest: string;
+  baseRef: string;
+}) {
+  // Pull base manifest
+  // TODO: can skip pulling if we already have a version of the manifest (by digest?)
+  const baseImage = await pullFullArtifact(opts.baseStore,
+    opts.baseRef.replace('$DenoVersion', Deno.version.deno));
+
+  // Inmemory store for the generated manifest
+  const storeStack = OciStore.stack({
+    writable: opts.stagingStore,
+    readable: [
+      opts.dociStore,
+      opts.baseStore,
+    ],
+  });
+
+  const annotations: Record<string, string> = {
+    'org.opencontainers.image.created': new Date().toISOString(),
+    'org.opencontainers.image.base.digest': baseImage.descriptor.digest,
+    'org.opencontainers.image.base.name': baseImage.reference.canonicalRef,
+  };
+  {
+    const gitSha = Deno.env.get('GITHUB_SHA');
+    if (gitSha) {
+      annotations['org.opencontainers.image.revision'] = gitSha;
+    }
+    const gitServer = Deno.env.get('GITHUB_SERVER_URL');
+    const gitRepo = Deno.env.get('GITHUB_REPOSITORY');
+    if (gitServer && gitRepo) {
+      annotations['org.opencontainers.image.source'] = `${gitServer}/${gitRepo}`;
+    }
+  }
+
+  return {
+    ejected: await ejectToImage({
+      baseDigest: baseImage.descriptor.digest,
+      dociDigest: opts.digest,
+      store: storeStack,
+      annotations,
+    }),
+    store: storeStack,
+  };
 }
 
 export async function extractLayer(store: OciStore.Api, layer: ManifestOCIDescriptor, destFolder: string) {

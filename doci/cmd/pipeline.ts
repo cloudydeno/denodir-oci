@@ -8,21 +8,25 @@ import {
 import * as OciStore from "../../lib/store.ts";
 import { pushFullArtifact } from "../transfers.ts";
 import { ejectToImage } from "../../lib/eject-to-image.ts";
-import { buildSimpleImage } from "../actions.ts";
+import { buildSimpleImage, die, exportTarArchive } from "../actions.ts";
 
+interface DociConfigLayer {
+  specifier: string;
+}
+interface DociConfigTarget {
+  ref: string;
+  baseRef?: string;
+}
 interface DociConfig {
   localFileRoot?: string;
-  entrypoint: {
-    specifier: string;
-  };
-  dependencyLayers?: Array<{
-    specifier: string;
-  }>;
+  entrypoint: DociConfigLayer;
+  dependencyLayers?: Array<DociConfigLayer>;
   cacheFlags?: Array<string>;
   runtimeFlags?: Array<string>;
   ejections?: Record<string, {
     base: string;
   }>;
+  targets?: Record<string, DociConfigTarget>;
 }
 
 const commonFlags = {
@@ -63,6 +67,71 @@ export const buildCommand = defineCommand({
 
     const fullPath = path.resolve(config.entrypoint.specifier);
     localStorage.setItem(`specifier_${fullPath}`, finalDigest);
+  },
+});
+
+export const exportCommand = defineCommand({
+  name: 'export',
+  description: `Saves an image as a tar archive, for loading into e.g. Podman or Docker`,
+  flags: {
+    ...commonFlags,
+    target: {
+      short: 't',
+      typeFn: String,
+      description: `Use a named target from the project's configuration file`,
+    },
+    output: {
+      short: 'o',
+      typeFn: String,
+      default: '-',
+      description: `Optionally a path on the filesystem to save the tar archive to`,
+    },
+    format: {
+      typeFn: String,
+      defaultV: 'auto',
+      description: 'Set either "docker" for a legacy archive or "oci" for the modern OCI Image Layout archive. Left alone, "auto" will use "oci" for raw artifacts and "docker" for runnable images',
+    },
+  },
+  async run(args, flags) {
+    const configText = await Deno.readTextFile(flags.config);
+    const config = parseYaml(configText) as DociConfig;
+
+    const target: DociConfigTarget | undefined = flags.target
+      ? config.targets?.[flags.target]
+      : { ref: 'deno.dir/pipeline' };
+    if (!target) throw die
+      `Target ${flags.target} not found in config file ${flags.config}`;
+
+    if (flags.format !== 'docker' && flags.format !== 'oci' && flags.format !== 'auto') throw die
+      `--format needs to be "docker" or "oci" or "auto", not ${flags.format}`;
+
+    flags.output ??= '-';
+    if (flags.output == '-' && Deno.isatty(Deno.stdout.rid)) die
+      `Refusing to write a tarball to a TTY, please redirect stdout`;
+
+    const fullPath = path.resolve(config.entrypoint.specifier);
+    const knownDigest = localStorage.getItem(`specifier_${fullPath}`);
+    if (!knownDigest) return die
+      `No existing digest for ${fullPath} - did you not already build?`;
+    console.error(`Using known digest`, knownDigest);
+
+    await exportTarArchive({
+      baseRef: target.baseRef ?? null,
+      digest: knownDigest,
+      format: flags.format,
+      targetRef: target.ref,
+
+      baseStore: await OciStore.local('base-storage'),
+      dociStore: await OciStore.local(),
+      stagingStore: OciStore.inMemory(),
+      targetStream: flags.output == '-'
+        ? Deno.stdout.writable
+        : await Deno.open(flags.output, {
+            write: true,
+            truncate: true,
+            create: true,
+          }).then(x => x.writable),
+    });
   },
 });
 
@@ -158,6 +227,7 @@ export const pipelineCommand = defineCommand({
   flags: commonFlags,
   commands: [
     buildCommand,
+    exportCommand,
     pushCommand,
   ],
 });

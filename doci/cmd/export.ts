@@ -1,11 +1,9 @@
 // make a tarball for a built artifact
 // https://github.com/opencontainers/image-spec/blob/main/image-layout.md
 
-import { defineCommand, copy } from "../../deps.ts";
-import { pullFullArtifact } from "../transfers.ts";
-import { ejectToImage } from "../../lib/eject-to-image.ts";
-import { exportArtifactAsArchive } from "../../lib/export-archive.ts";
+import { defineCommand } from "../../deps.ts";
 import * as OciStore from "../../lib/store.ts";
+import { die, exportTarArchive } from "../actions.ts";
 
 export const exportCommand = defineCommand({
   name: 'export',
@@ -22,53 +20,34 @@ export const exportCommand = defineCommand({
     },
     format: {
       typeFn: String,
-      defaultV: 'docker',
+      defaultV: 'auto',
       description: 'Either "docker" for a legacy archive or "oci" for the modern OCI Image Layout archive',
     },
     tag: {
       typeFn: String,
+      defaultV: 'deno.dir/export',
     },
   },
   async run(args, flags) {
     console.error('');
 
-    if (!flags.digest)
-      throw '--digest is required';
-    if (!flags.digest.startsWith('sha256:'))
-      throw '--digest should be a sha256:... string';
-    if (flags.format !== 'docker' && flags.format !== 'oci')
-      throw '--format needs to be "docker" or "oci"';
+    if (!flags.digest?.startsWith('sha256:')) throw die
+      `--digest should be a sha256:... string`;
+    if (flags.format !== 'docker' && flags.format !== 'oci' && flags.format !== 'auto') throw die
+      `--format needs to be "docker" or "oci" or "auto", not ${flags.format}`;
 
-    // Pull base manifest
-    // TODO: can skip pulling if we already have a version of the manifest (by digest?)
-    const baseStore = await OciStore.local('base-storage');
-    const baseId = await pullFullArtifact(baseStore,
-      flags.base.replace('$DenoVersion', Deno.version.deno));
+    if (Deno.isatty(Deno.stdout.rid)) die
+      `Refusing to write a tarball to a TTY, please redirect stdout`;
 
-    // Inmemory store for the generated manifest
-    const storeStack = OciStore.stack({
-      writable: OciStore.inMemory(),
-      readable: [
-        await OciStore.local(),
-        baseStore,
-      ],
-    });
-
-    // TODO: export without ejecting (as OCI artifact format)
-    const ejected = await ejectToImage({
-      baseDigest: baseId.digest,
-      dociDigest: flags.digest,
-      store: storeStack,
-    });
-
-    console.error(`Exporting to archive...`, ejected.digest);
-
-    const tar = await exportArtifactAsArchive({
+    await exportTarArchive({
+      baseRef: flags.base,
+      digest: flags.digest,
       format: flags.format,
-      manifestDigest: ejected.digest,
-      store: storeStack,
-      fullRef: flags.tag,
-    });
+      targetRef: flags.tag,
 
-    await copy(tar.getReader(), Deno.stdout);
+      baseStore: await OciStore.local('base-storage'),
+      dociStore: await OciStore.local(),
+      stagingStore: OciStore.inMemory(),
+      targetStream: Deno.stdout.writable,
+    });
   }});

@@ -57,10 +57,7 @@ export class OciStoreLocal implements OciStoreApi {
     const target = await Deno.open(layerPath, {
       write: true, truncate: true, create: true,
     });
-    for await (const chunk of stream) {
-      await writeAll(target, chunk);
-    }
-    target.close();
+    await stream.pipeTo(target.writable);
 
     return descriptor;
   }

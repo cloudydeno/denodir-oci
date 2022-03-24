@@ -1,4 +1,5 @@
 // https://stackoverflow.com/a/53593328/3582903
+// TODO: return Uint8Array instead of string
 export function stableJsonStringify<T=unknown>( obj: T )
 {
     var allKeys: string[] = [];

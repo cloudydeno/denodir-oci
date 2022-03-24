@@ -126,7 +126,10 @@ export async function pullFullArtifact(store: OciStore.Api, reference: string) {
   }, await manifestResp.dockerBody());
 
   console.error('==>', 'Pull complete!', manifestDescriptor.digest);
-  return manifestDescriptor;
+  return {
+    descriptor: manifestDescriptor,
+    reference: rar,
+  };
 }
 
 function showStreamProgress(totalSize: number) {
