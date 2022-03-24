@@ -1,14 +1,12 @@
 import {
   defineCommand,
-  parseRepoAndRef,
   parseYaml,
   path,
 } from "../../deps.ts";
 
 import * as OciStore from "../../lib/store.ts";
 import { pushFullArtifact } from "../transfers.ts";
-import { ejectToImage } from "../../lib/eject-to-image.ts";
-import { buildSimpleImage, die, exportTarArchive } from "../actions.ts";
+import { buildSimpleImage, die, ejectArtifact, exportTarArchive } from "../actions.ts";
 
 interface DociConfigLayer {
   specifier: string;
@@ -67,8 +65,7 @@ export const buildCommand = defineCommand({
 
     const fullPath = path.resolve(config.entrypoint.specifier);
     localStorage.setItem(`specifier_${fullPath}`, finalDigest);
-  },
-});
+  }});
 
 export const exportCommand = defineCommand({
   name: 'export',
@@ -106,12 +103,12 @@ export const exportCommand = defineCommand({
       `--format needs to be "docker" or "oci" or "auto", not ${flags.format}`;
 
     flags.output ??= '-';
-    if (flags.output == '-' && Deno.isatty(Deno.stdout.rid)) die
+    if (flags.output == '-' && Deno.isatty(Deno.stdout.rid)) throw die
       `Refusing to write a tarball to a TTY, please redirect stdout`;
 
     const fullPath = path.resolve(config.entrypoint.specifier);
     const knownDigest = localStorage.getItem(`specifier_${fullPath}`);
-    if (!knownDigest) return die
+    if (!knownDigest) throw die
       `No existing digest for ${fullPath} - did you not already build?`;
     console.error(`Using known digest`, knownDigest);
 
@@ -132,8 +129,7 @@ export const exportCommand = defineCommand({
             create: true,
           }).then(x => x.writable),
     });
-  },
-});
+  }});
 
 export const pushCommand = defineCommand({
   name: 'push',
@@ -156,70 +152,26 @@ export const pushCommand = defineCommand({
 
     const fullPath = path.resolve(config.entrypoint.specifier);
     const knownDigest = localStorage.getItem(`specifier_${fullPath}`);
-    if (!knownDigest) throw `No digest found for ${JSON.stringify(fullPath)}`;
+    if (!knownDigest) throw die
+      `No digest found for ${fullPath}`;
     console.error(`Using known digest`, knownDigest);
 
-    const store = await OciStore.local();
-
     if (!flags.eject) {
-      await pushFullArtifact(store, knownDigest, args.target);
-      return;
+      await pushFullArtifact(await OciStore.local(), knownDigest, args.target);
+
+    } else {
+      const {ejected, store} = await ejectArtifact({
+        baseRef: flags.eject,
+        digest: knownDigest,
+
+        baseStore: await OciStore.local('base-storage'),
+        dociStore: await OciStore.local(),
+        stagingStore: OciStore.inMemory(),
+      });
+
+      await pushFullArtifact(store, ejected.digest, args.target);
     }
-
-    const ejectBase = config.ejections?.[flags.eject];
-    if (!ejectBase) throw `No ejection config found for ${flags.eject}`;
-    var rar = parseRepoAndRef(ejectBase.base.replace('$DenoVersion', Deno.version.deno));
-    const ref = rar.tag ?? rar.digest;
-    if (!ref) throw 'No base tag or digest found';
-
-    const baseStore = await OciStore.registry(rar, ['pull']);
-
-    // TODO: only needs to resolve ref to digest (with HEAD)
-    const {manifest, resp: manifestResp} = await baseStore.api.getManifest({
-      ref,
-      acceptOCIManifests: true,
-      acceptManifestLists: true,
-    });
-
-    const manifestDigest = manifestResp.headers.get('docker-content-digest');
-    if (!manifestDigest) throw new Error(`No digest returned on manifest fetch`);
-
-    // Inmemory store for the generated manifest
-    const storeStack = OciStore.stack({
-      writable: OciStore.inMemory(),
-      readable: [
-        await OciStore.local(),
-        baseStore,
-      ],
-    });
-
-    const annotations: Record<string, string> = {
-      'org.opencontainers.image.created': new Date().toISOString(),
-      'org.opencontainers.image.base.digest': manifestDigest,
-      'org.opencontainers.image.base.name': rar.canonicalName ?? '',
-    };
-    {
-      const gitSha = Deno.env.get('GITHUB_SHA');
-      if (gitSha) {
-        annotations['org.opencontainers.image.revision'] = gitSha;
-      }
-      const gitServer = Deno.env.get('GITHUB_SERVER_URL');
-      const gitRepo = Deno.env.get('GITHUB_REPOSITORY');
-      if (gitServer && gitRepo) {
-        annotations['org.opencontainers.image.source'] = `${gitServer}/${gitRepo}`;
-      }
-    }
-
-    const ejected = await ejectToImage({
-      baseDigest: manifestDigest,
-      dociDigest: knownDigest,
-      store: storeStack,
-      annotations,
-    });
-
-    await pushFullArtifact(storeStack, ejected.digest, args.target);
-  },
-});
+  }});
 
 export const pipelineCommand = defineCommand({
   name: 'pipeline',

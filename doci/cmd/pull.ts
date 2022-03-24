@@ -14,11 +14,5 @@ export const pullCommand = defineCommand({
   flags: {
   },
   async run(args, flags) {
-    console.log('');
-    // if (!flags.digest || !flags.destination) throw '--digest and --reference are required';
-    // if (!flags.digest.startsWith('sha256:')) throw '--digest should be a sha256:... string';
-
-    const store = await OciStore.local();
-
-    await pullFullArtifact(store, args.remote);
+    await pullFullArtifact(await OciStore.local(), args.remote);
   }});

@@ -1,5 +1,6 @@
 import { defineCommand } from "../../deps.ts";
 import * as OciStore from "../../lib/store.ts";
+import { die } from "../actions.ts";
 import { pushFullArtifact } from "../transfers.ts";
 
 export const pushCommand = defineCommand({
@@ -16,11 +17,10 @@ export const pushCommand = defineCommand({
     },
   },
   async run(args, flags) {
-    console.log('');
-    if (!flags.digest || !flags.destination) throw '--digest and --reference are required';
-    if (!flags.digest.startsWith('sha256:')) throw '--digest should be a sha256:... string';
+    if (!flags.digest || !flags.destination) throw die
+      `--digest and --reference are required`;
+    if (!flags.digest.startsWith('sha256:')) throw die
+      `--digest should be a sha256:... string`;
 
-    const store = await OciStore.local();
-
-    await pushFullArtifact(store, flags.digest, flags.destination);
+    await pushFullArtifact(await OciStore.local(), flags.digest, flags.destination);
   }});

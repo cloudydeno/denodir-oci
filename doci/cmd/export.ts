@@ -1,6 +1,3 @@
-// make a tarball for a built artifact
-// https://github.com/opencontainers/image-spec/blob/main/image-layout.md
-
 import { defineCommand } from "../../deps.ts";
 import * as OciStore from "../../lib/store.ts";
 import { die, exportTarArchive } from "../actions.ts";
@@ -29,14 +26,12 @@ export const exportCommand = defineCommand({
     },
   },
   async run(args, flags) {
-    console.error('');
-
     if (!flags.digest?.startsWith('sha256:')) throw die
       `--digest should be a sha256:... string`;
     if (flags.format !== 'docker' && flags.format !== 'oci' && flags.format !== 'auto') throw die
       `--format needs to be "docker" or "oci" or "auto", not ${flags.format}`;
 
-    if (Deno.isatty(Deno.stdout.rid)) die
+    if (Deno.isatty(Deno.stdout.rid)) throw die
       `Refusing to write a tarball to a TTY, please redirect stdout`;
 
     await exportTarArchive({

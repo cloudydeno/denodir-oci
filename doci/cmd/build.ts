@@ -30,7 +30,6 @@ export const buildCommand = defineCommand({
     },
   },
   async run(args, flags) {
-    console.log('');
 
     const denoFlags = [
       ...(flags.unstable ? ['--unstable'] : []),

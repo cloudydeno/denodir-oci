@@ -1,6 +1,6 @@
 import { defineCommand } from "../../deps.ts";
 import * as OciStore from "../../lib/store.ts";
-import { runArtifact } from "../actions.ts";
+import { die, runArtifact } from "../actions.ts";
 
 export const runCommand = defineCommand({
   name: 'run',
@@ -14,11 +14,10 @@ export const runCommand = defineCommand({
     },
   },
   async run(args, flags) {
-    console.error('');
-
-    // if (!flags.digest && !flags.pull) throw 'One of --digest or --remote or --local are required';
-    if (!flags.digest) throw '--digest is required for now';
-    if (!flags.digest.startsWith('sha256:')) throw '--digest should be a sha256:... string';
+    if (!flags.digest) throw die
+      `--digest is required for now`;
+    if (!flags.digest.startsWith('sha256:')) throw die
+      `--digest should be a sha256:... string`;
 
     // Break apart the arguments
     const argsAll = [...args['--']];
@@ -32,5 +31,4 @@ export const runCommand = defineCommand({
       runtimeFlags,
       scriptFlags,
     });
-
   }});

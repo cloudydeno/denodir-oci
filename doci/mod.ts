@@ -12,6 +12,7 @@ import { pipelineCommand } from "./cmd/pipeline.ts";
 // https://github.com/ydcjeff/komando/commit/fea0bd01ccf934d982eea96d2728b3651ef62df9
 (Deno as any).consoleSize ??= () => ({columns: 80, rows: 24});
 
+console.error('');
 komando({
   name: 'doci',
   version: '0.1.0',

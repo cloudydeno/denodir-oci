@@ -3,7 +3,7 @@
 import { defineCommand, ManifestOCI, path } from "../../deps.ts";
 import * as OciStore from "../../lib/store.ts";
 import type { DenodirArtifactConfig } from "../../lib/types.ts";
-import { extractLayer } from "../actions.ts";
+import { die, extractLayer } from "../actions.ts";
 
 export const unpackCommand = defineCommand({
   name: 'unpack',
@@ -22,17 +22,19 @@ export const unpackCommand = defineCommand({
     }
   },
   async run(args, flags) {
-    console.error('');
-    if (!flags.digest) throw '--digest is required for now';
-    if (!flags.digest.startsWith('sha256:')) throw '--digest should be a sha256:... string';
+    if (!flags.digest) throw die
+      `--digest is required for now`;
+    if (!flags.digest.startsWith('sha256:')) throw die
+      `--digest should be a sha256:... string`;
 
-    if (!flags.destination) throw '--destination is required and must exist';
+    if (!flags.destination) throw die
+      `--destination is required and must exist`;
     try {
-      for await (const item of Deno.readDir(flags.destination)) {
-        throw `The destination folder ${JSON.stringify(flags.destination)} is not empty, I saw ${JSON.stringify(item.name)}`;
-      }
+      for await (const item of Deno.readDir(flags.destination)) throw die
+        `The destination folder ${flags.destination} is not empty, I saw ${item.name}`;
     } catch (err) {
-      throw `The destination folder ${JSON.stringify(flags.destination)} could not be read: ${err.message}`;
+      throw die
+        `The destination folder ${flags.destination} could not be read: ${err.message}`;
     }
 
     const store = await OciStore.local();
@@ -40,10 +42,10 @@ export const unpackCommand = defineCommand({
     const manifestRaw = await store.getFullLayer('manifest', flags.digest);
     const manifest: ManifestOCI = JSON.parse(new TextDecoder().decode(manifestRaw));
 
-    if (manifest.schemaVersion !== 2) throw new Error(
-      `bad schemaversion ${manifest.schemaVersion}`);
-    if (manifest.mediaType as string !== 'application/vnd.oci.image.manifest.v1+json') throw new Error(
-      `bad mediatype ${JSON.stringify(manifest.mediaType)}`);
+    if (manifest.schemaVersion !== 2) throw die
+      `bad schemaversion ${manifest.schemaVersion}`;
+    if (manifest.mediaType as string !== 'application/vnd.oci.image.manifest.v1+json') throw die
+      `bad mediatype ${manifest.mediaType}`;
 
     const configDigest = manifest.config.digest;
     const configRaw = await store.getFullLayer('blob', configDigest);
@@ -54,14 +56,14 @@ export const unpackCommand = defineCommand({
     if (configData.runtimeFlags?.includes?.('--no-check')) runtimeFlags.push('--no-check');
 
     const builtWithDeno = `${configData.builtWith?.deno ?? '0.0.0'}`.split('.');
-    if (builtWithDeno.length !== 3) throw new Error(
-      `Failed to read builtWith from ${JSON.stringify(configData)}`);
+    if (builtWithDeno.length !== 3) throw die
+      `Failed to read builtWith from ${configData}`;
     const thisDeno = Deno.version.deno.split('.');
-    if (thisDeno.length !== 3) throw new Error(
-      `Failed to read local Deno version from ${JSON.stringify(Deno.version)}`);
+    if (thisDeno.length !== 3) throw die
+      `Failed to read local Deno version from ${Deno.version}`;
 
-    if (thisDeno[0] !== builtWithDeno[0]) throw new Error(
-      `This artifact came from a different Deno major version: ${builtWithDeno.join('.')}`);
+    if (thisDeno[0] !== builtWithDeno[0]) throw die
+      `This artifact came from a different Deno major version: ${builtWithDeno.join('.')}`;
     if (parseInt(thisDeno[1], 10) < parseInt(builtWithDeno[1], 10)) console.error(
       `WARN: This artifact came from a newer Deno minor version: ${builtWithDeno.join('.')}`);
 
@@ -71,7 +73,6 @@ export const unpackCommand = defineCommand({
       }
       console.error('Extracting layer', layer.digest, '...');
       await extractLayer(store, layer, flags.destination);
-      // console.error('Done with layer.', result);
     }
 
     const denoCmd = [`deno`, `run`, ...runtimeFlags, `--`, `${configData.entrypoint}`];
