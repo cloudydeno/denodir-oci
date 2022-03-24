@@ -16,12 +16,6 @@ export interface OciStoreApi {
     stream: ReadableStream<Uint8Array>,
   ): Promise<ManifestOCIDescriptor>;
 
-  putLayerFromString(
-    flavor: 'blob' | 'manifest',
-    descriptor: Omit<ManifestOCIDescriptor, 'digest' | 'size'> & { digest?: string },
-    rawString: string,
-  ): Promise<ManifestOCIDescriptor>;
-
   putLayerFromBytes(
     flavor: 'blob' | 'manifest',
     descriptor: Omit<ManifestOCIDescriptor, 'digest' | 'size'> & { digest?: string },
@@ -35,6 +29,4 @@ export interface OciStoreApi {
   getFullLayer(flavor: 'blob' | 'manifest', digest: string): Promise<Uint8Array>;
 
   getLayerStream(flavor: 'blob' | 'manifest', digest: string): Promise<ReadableStream<Uint8Array>>;
-
-  // async extractLayerLocally(layer: ManifestOCIDescriptor, destFolder: string);
 }

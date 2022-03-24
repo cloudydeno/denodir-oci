@@ -12,7 +12,7 @@ import {
 } from "../deps.ts";
 import * as OciStore from "./store.ts";
 import { sha256bytesToHex } from "./util/digest.ts";
-import { stableJsonStringify } from "./util/serialize.ts";
+import { stableJsonSerialize } from "./util/serialize.ts";
 
 /**
  * Given a description of an OCI or Docker image,
@@ -147,7 +147,7 @@ export async function exportArtifactAsArchive(opts: {
 
 
 function tarJson(data: unknown) {
-  return tarBytes(new TextEncoder().encode(stableJsonStringify(data)));
+  return tarBytes(stableJsonSerialize(data));
 }
 
 function tarBytes(raw: Uint8Array) {

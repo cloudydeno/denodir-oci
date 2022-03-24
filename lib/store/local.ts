@@ -62,15 +62,6 @@ export class OciStoreLocal implements OciStoreApi {
     return descriptor;
   }
 
-  async putLayerFromString(
-    flavor: 'blob' | 'manifest',
-    descriptor: Omit<ManifestOCIDescriptor, 'digest' | 'size'> & { digest?: string },
-    rawString: string
-  ): Promise<ManifestOCIDescriptor> {
-    const rawData = new TextEncoder().encode(rawString);
-    return await this.putLayerFromBytes(flavor, descriptor, rawData);
-  }
-
   async putLayerFromBytes(
     flavor: 'blob' | 'manifest',
     descriptor: Omit<ManifestOCIDescriptor, 'digest' | 'size'> & { digest?: string },

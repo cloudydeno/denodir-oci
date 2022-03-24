@@ -11,7 +11,7 @@ import {
 import type { DenodirArtifactConfig, OciImageConfig } from "./types.ts";
 import * as OciStore from "./store.ts";
 import { sha256stream } from "./util/digest.ts";
-import { stableJsonStringify } from "./util/serialize.ts";
+import { stableJsonSerialize } from "./util/serialize.ts";
 import { ImageConfigWriter } from "./util/image-config.ts";
 
 /**
@@ -44,9 +44,9 @@ export async function ejectToImage(opts: {
         )),
     };
 
-    return await opts.store.putLayerFromString('manifest', {
+    return await opts.store.putLayerFromBytes('manifest', {
       mediaType: MEDIATYPE_OCI_MANIFEST_INDEX_V1,
-    }, stableJsonStringify(newList));
+    }, stableJsonSerialize(newList));
 
   } else if (baseManifest.mediaType !== MEDIATYPE_MANIFEST_V2
    && baseManifest.mediaType !== MEDIATYPE_OCI_MANIFEST_V1) {
@@ -86,13 +86,13 @@ export async function ejectToImage(opts: {
   ]);
   configWriter.setCommand([]);
 
-  const configDesc = await opts.store.putLayerFromString('blob', {
+  const configDesc = await opts.store.putLayerFromBytes('blob', {
     mediaType: "application/vnd.oci.image.config.v1+json",
-  }, stableJsonStringify(configWriter.data));
+  }, stableJsonSerialize(configWriter.data));
 
-  const manifestDesc = await opts.store.putLayerFromString('manifest', {
+  const manifestDesc = await opts.store.putLayerFromBytes('manifest', {
     mediaType: MEDIATYPE_OCI_MANIFEST_V1,
-  }, stableJsonStringify<ManifestOCI>({
+  }, stableJsonSerialize<ManifestOCI>({
     schemaVersion: 2,
     mediaType: MEDIATYPE_OCI_MANIFEST_V1,
     config: configDesc,

@@ -67,14 +67,6 @@ export class StackedStore implements OciStoreApi {
     const store = this.ensureRwStore();
     return await store.putLayerFromStream(flavor, descriptor, stream);
   }
-  async putLayerFromString(
-    flavor: 'blob' | 'manifest',
-    descriptor: Omit<ManifestOCIDescriptor, 'digest' | 'size'> & { digest?: string },
-    rawString: string,
-  ) {
-    const store = this.ensureRwStore();
-    return await store.putLayerFromString(flavor, descriptor, rawString);
-  }
   async putLayerFromBytes(
     flavor: 'blob' | 'manifest',
     descriptor: Omit<ManifestOCIDescriptor, 'digest' | 'size'> & { digest?: string },

@@ -44,9 +44,6 @@ export class OciRegistry implements OciStoreApi {
   putLayerFromStream(flavor: "blob"|"manifest",descriptor: ManifestOCIDescriptor,stream: ReadableStream<Uint8Array>): Promise<ManifestOCIDescriptor> {
     throw new Error("Method not implemented.");
   }
-  putLayerFromString(flavor: "blob"|"manifest",descriptor: Omit<ManifestOCIDescriptor,"digest"|"size">&{ digest?: string|undefined; },rawString: string): Promise<ManifestOCIDescriptor> {
-    throw new Error("Method not implemented.");
-  }
   putLayerFromBytes(flavor: "blob"|"manifest",descriptor: Omit<ManifestOCIDescriptor,"digest"|"size">&{ digest?: string|undefined; },rawData: Uint8Array): Promise<ManifestOCIDescriptor> {
     throw new Error("Method not implemented.");
   }

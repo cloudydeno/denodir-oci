@@ -14,7 +14,7 @@ import { OciStoreApi } from "./store/_api.ts";
 import type { DenodirArtifactConfig } from "./types.ts";
 import { sha256stream, sha256string } from "./util/digest.ts";
 import { gzipStream } from "./util/gzip.ts";
-import { stableJsonStringify } from "./util/serialize.ts";
+import { stableJsonSerialize } from "./util/serialize.ts";
 
 export class BuildContext {
   tempDir = Deno.makeTempDirSync({prefix: 'denodir-oci-build-'});
@@ -55,9 +55,9 @@ export class BuildContext {
     }
 
     this.config = config;
-    this.configBlob = await store.putLayerFromString('blob', {
+    this.configBlob = await store.putLayerFromBytes('blob', {
       mediaType: "application/vnd.deno.denodir.config.v1+json",
-    }, stableJsonStringify(this.config));
+    }, stableJsonSerialize(this.config));
 
     this.manifest = {
       schemaVersion: 2,
@@ -65,9 +65,9 @@ export class BuildContext {
       config: this.configBlob,
       layers: this.layers.map(x => x.descriptor!),
     };
-    this.manifestBlob = await store.putLayerFromString('manifest', {
+    this.manifestBlob = await store.putLayerFromBytes('manifest', {
       mediaType: this.manifest.mediaType!,
-    }, stableJsonStringify(this.manifest));
+    }, stableJsonSerialize(this.manifest));
 
     return this.manifestBlob.digest;
   }
@@ -320,7 +320,7 @@ async function cleanDepsMeta(filePath: string) {
 
   delete meta.now;
 
-  const cleanMeta = new TextEncoder().encode(stableJsonStringify(meta));
+  const cleanMeta = stableJsonSerialize(meta);
   return {
     reader: new Buffer(cleanMeta),
     contentSize: cleanMeta.byteLength,
