@@ -11,6 +11,7 @@ import {
   readableStreamFromReader,
 } from "../deps.ts";
 import { OciStoreApi } from "./store/_api.ts";
+import type { DenodirArtifactConfig } from "./types.ts";
 import { sha256stream, sha256string } from "./util/digest.ts";
 import { gzipStream } from "./util/gzip.ts";
 import { stableJsonStringify } from "./util/serialize.ts";
@@ -19,7 +20,7 @@ export class BuildContext {
   tempDir = Deno.makeTempDirSync({prefix: 'denodir-oci-build-'});
   layers = new Array<DociLayer>();
 
-  config?: Record<string, unknown>;
+  config?: DenodirArtifactConfig;
   configBlob?: ManifestOCIDescriptor;
 
   manifest?: ManifestOCI;
@@ -41,7 +42,7 @@ export class BuildContext {
     return layer;
   }
 
-  async storeTo(store: OciStoreApi, config: Record<string, unknown>) {
+  async storeTo(store: OciStoreApi, config: DenodirArtifactConfig) {
     if (this.layers.length < 1) throw new Error(
       `Need at least one layer to make a manifest`);
     if (this.layers.some(x => !x.descriptor?.digest)) throw new Error(

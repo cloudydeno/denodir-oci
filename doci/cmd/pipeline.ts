@@ -5,11 +5,10 @@ import {
   path,
 } from "../../deps.ts";
 
-import { BuildContext, DociLayer } from "../../lib/build.ts";
 import * as OciStore from "../../lib/store.ts";
 import { pushFullArtifact } from "../transfers.ts";
 import { ejectToImage } from "../../lib/eject-to-image.ts";
-import { DenodirArtifactConfig } from "../../lib/types.ts";
+import { buildSimpleImage } from "../actions.ts";
 
 interface DociConfig {
   localFileRoot?: string;
@@ -49,53 +48,21 @@ export const buildCommand = defineCommand({
     const configText = await Deno.readTextFile(flags.config);
     const config = parseYaml(configText) as DociConfig;
 
-    const ctx = new BuildContext();
-    try {
+    const finalDigest = await buildSimpleImage({
+      store: await OciStore.local(),
+      cacheFlags: config.cacheFlags ?? [],
+      runtimeFlags: config.runtimeFlags ?? [],
+      depSpecifiers: config.dependencyLayers?.map(x => x.specifier) ?? [],
+      mainSpecifier: config.entrypoint.specifier,
+      localFileRoot: path.resolve(path.dirname(flags.config), config.localFileRoot ?? '.'),
+    });
 
-      // Cache and typecheck the module before we even consider emitting
-      await ctx.cacheSpecifier(config.entrypoint.specifier, config.cacheFlags);
-
-      const store = await OciStore.local();
-
-      const localFileRoot = path.resolve(path.dirname(flags.config), config.localFileRoot ?? '.');
-
-      // Keep it simple - always stack the layers linearly
-      let baseSpecifier: string | undefined = undefined;
-      for (const {specifier} of config.dependencyLayers ?? []) {
-        console.error('-->', 'Packing', specifier, '...');
-        const layer: DociLayer = await ctx.addLayer(specifier, {
-          baseSpecifier,
-          includeBuildInfo: false,
-          localFileRoot,
-        });
-        baseSpecifier = layer.mainSpecifier;
-      }
-
-      console.error('-->', 'Packing', config.entrypoint.specifier, '...');
-      const mainLayer = await ctx.addLayer(config.entrypoint.specifier, {
-        baseSpecifier,
-        includeBuildInfo: !config.runtimeFlags?.includes('--no-check'),
-        localFileRoot,
-      });
-
-      const artifactConfig: DenodirArtifactConfig = {
-        builtWith: Deno.version,
-        entrypoint: mainLayer.mainSpecifier,
-        runtimeFlags: config.runtimeFlags ?? [],
-      };
-      const finalDigest = await ctx.storeTo(store, artifactConfig as any);
-      console.error('==>', `Stored manifest`, finalDigest);
-      if (flags.output == 'digest') {
-        console.log(finalDigest);
-      }
-
-      const fullPath = path.resolve(config.entrypoint.specifier);
-      localStorage.setItem(`specifier_${fullPath}`, finalDigest);
-
-    } finally {
-      await Deno.remove(ctx.tempDir, { recursive: true });
+    if (flags.output == 'digest') {
+      console.log(finalDigest);
     }
 
+    const fullPath = path.resolve(config.entrypoint.specifier);
+    localStorage.setItem(`specifier_${fullPath}`, finalDigest);
   },
 });
 

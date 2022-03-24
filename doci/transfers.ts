@@ -62,20 +62,11 @@ export async function pushFullImage(opts: {
   client: OciRegistry;
   ref: string;
 }) {
-  // const manifestRaw = await sourceStore.getFullLayer('manifest', manifestDigest);
-  // const manifest: ManifestOCI | ManifestOCIIndex = JSON.parse(new TextDecoder().decode(manifestRaw));
-
-  // var rar = parseRepoAndRef(destination);
-  // const ref = rar.tag ?? rar.digest;
-  // if (!ref) throw 'No desired tag or digest found';
-
-  // const client = await OciStore.registry(rar, ['pull', 'push']);
-
   for (const layer of [opts.manifest.config, ...opts.manifest.layers]) {
     if (await opts.client.hasBlob(layer.digest)) {
-      console.error('   ', 'Layer', layer.digest, 'is already present on registry');
+      console.error('   ', 'Register already has', layer.digest);
     } else {
-      console.error('   ', 'Need to upload', layer.digest, '...');
+      console.error('   ', 'Uploading', layer.digest, '...');
       await opts.client.uploadBlob(layer, () => opts.sourceStore
         .getLayerStream('blob', layer.digest)
         .then(stream => stream
@@ -84,13 +75,11 @@ export async function pushFullImage(opts: {
     }
   }
 
-  const resp = await opts.client.api.putManifest({
+  return await opts.client.api.putManifest({
     manifestData: opts.manifestRaw,
     mediaType: opts.manifest.mediaType,
     ref: opts.ref,
   });
-  // console.error('==>', 'Upload complete!', resp.digest);
-  return resp;
 }
 
 export async function pullFullArtifact(store: OciStore.Api, reference: string) {

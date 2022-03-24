@@ -3,6 +3,7 @@
 import { defineCommand, ManifestOCI, path } from "../../deps.ts";
 import * as OciStore from "../../lib/store.ts";
 import type { DenodirArtifactConfig } from "../../lib/types.ts";
+import { extractLayer } from "../actions.ts";
 
 export const unpackCommand = defineCommand({
   name: 'unpack',
@@ -69,7 +70,7 @@ export const unpackCommand = defineCommand({
         console.error(`WARN: skipping unexpected layer type "${layer.mediaType}"`);
       }
       console.error('Extracting layer', layer.digest, '...');
-      await store.extractLayerLocally(layer, flags.destination);
+      await extractLayer(store, layer, flags.destination);
       // console.error('Done with layer.', result);
     }
 
