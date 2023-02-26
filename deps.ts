@@ -1,4 +1,3 @@
-export { readAll } from "https://deno.land/std@0.177.0/streams/read_all.ts";
 export { writeAll } from "https://deno.land/std@0.177.0/streams/write_all.ts";
 export { copy } from "https://deno.land/std@0.177.0/streams/copy.ts";
 export { readableStreamFromReader } from "https://deno.land/std@0.177.0/streams/readable_stream_from_reader.ts";

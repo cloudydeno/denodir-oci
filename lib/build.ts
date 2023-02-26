@@ -1,7 +1,6 @@
 import {
   ManifestOCIDescriptor,
   ManifestOCI,
-  readAll,
   ModuleGraphJson,
   assertEquals,
   Tar,
@@ -115,11 +114,11 @@ export async function buildDenodirLayer(opts: {
     stdin: 'null',
     stdout: 'piped',
   });
-  const raw = await readAll(proc.stdout);
+  const raw = await new Response(proc.stdout.readable).text();
   const status = await proc.status();
   if (!status.success) throw 'deno info failed';
 
-  const data = JSON.parse(new TextDecoder().decode(raw)) as ModuleGraphJson;
+  const data = JSON.parse(raw) as ModuleGraphJson;
 
   const {localFileRoot} = opts;
   function rewriteFilePath(fileSpecifier: string, opts?: {

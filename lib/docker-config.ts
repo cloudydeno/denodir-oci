@@ -1,4 +1,4 @@
-import { path, readAll, writeAll } from "../deps.ts";
+import { path, writeAll } from "../deps.ts";
 
 export async function readDockerConfig(): Promise<DockerConfig> {
   const filePath = path.join(Deno.env.get('HOME') ?? '.', '.docker', 'config.json');
@@ -79,7 +79,7 @@ class DockerCredentialHelper {
     }
     proc.stdin.close();
 
-    const stdout = new TextDecoder().decode(await readAll(proc.stdout));
+    const stdout = await new Response(proc.stdout.readable).text();
     if (stdout.includes('credentials not found')) {
       return null;
     }
