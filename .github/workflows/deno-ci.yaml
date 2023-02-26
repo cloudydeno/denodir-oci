@@ -40,19 +40,25 @@ jobs:
       run: time deno check doci/mod.ts
 
     - name: Build example artifacts - colors
+      env:
+        DOCI_CONFIG_FILE: registry/examples/colors.yaml
       run: |
-        time ./doci/mod.ts pipeline build --config registry/examples/colors.yaml
-        time ./doci/mod.ts pipeline export --config registry/examples/colors.yaml --target alpine | docker load
+        time ./doci/mod.ts pipeline build
+        time ./doci/mod.ts pipeline export --target alpine | docker load
         time docker run --rm --read-only deno.dir/examples/colors
 
     - name: Build example artifacts - flags
+      env:
+        DOCI_CONFIG_FILE: registry/examples/flags.yaml
       run: |
-        time ./doci/mod.ts pipeline build --config registry/examples/flags.yaml
-        time ./doci/mod.ts pipeline export --config registry/examples/flags.yaml --target alpine | docker load
+        time ./doci/mod.ts pipeline build
+        time ./doci/mod.ts pipeline export --target alpine | docker load
         time docker run --rm --read-only deno.dir/examples/flags --hello=world yup
 
     - name: Build example artifacts - welcome
+      env:
+        DOCI_CONFIG_FILE: registry/examples/welcome.yaml
       run: |
-        time ./doci/mod.ts pipeline build --config registry/examples/welcome.yaml
-        time ./doci/mod.ts pipeline export --config registry/examples/welcome.yaml --target alpine | docker load
+        time ./doci/mod.ts pipeline build
+        time ./doci/mod.ts pipeline export --target alpine | docker load
         time docker run --rm --read-only deno.dir/examples/welcome

@@ -1,6 +1,5 @@
 import {
   defineCommand,
-  parseRepoAndRef,
   parseYaml,
   path,
 } from "../../deps.ts";
@@ -31,7 +30,7 @@ interface DociConfig {
 const commonFlags = {
   config: {
     typeFn: String,
-    defaultV: 'doci.yaml',
+    defaultV: Deno.env.get('DOCI_CONFIG_FILE') || 'doci.yaml',
     description: 'Path to a denodir-oci pipeline configuration file',
   },
 };
