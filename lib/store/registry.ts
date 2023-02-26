@@ -84,6 +84,7 @@ export async function getOciRegistry(repo: RegistryRepo, scopes: ['pull', 'push'
   const config: RegistryClientOpts = {
     repo, scopes,
     acceptOCIManifests: true,
+    acceptManifestLists: true,
   };
 
   const credential = await fetchDockerCredential(repo.index.name);
