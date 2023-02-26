@@ -3,10 +3,14 @@ import {
   ManifestOCI,
   ManifestOCIIndex,
   MEDIATYPE_MANIFEST_V2,
+  MEDIATYPE_MANIFEST_LIST_V2,
   MEDIATYPE_OCI_MANIFEST_V1,
   MEDIATYPE_OCI_MANIFEST_INDEX_V1,
   parseRepoAndRef,
   ProgressBar,
+  RegistryRepo,
+  Manifest,
+  ManifestOCIDescriptor,
 } from "../deps.ts";
 import * as OciStore from "../lib/store.ts";
 import { OciRegistry } from "../lib/store/registry.ts";
@@ -83,53 +87,117 @@ export async function pushFullImage(opts: {
 }
 
 export async function pullFullArtifact(store: OciStore.Api, reference: string) {
+
   var rar = parseRepoAndRef(reference);
   const ref = rar.tag ?? rar.digest;
   if (!ref) throw 'No desired tag or digest found';
 
-  const client = await OciStore.registry(rar, ['pull']);
+  const puller = await ArtifactPuller.makeForReference(store, rar);
 
-  const {manifest, resp: manifestResp} = await client.api.getManifest({ ref })
-  if (manifest.mediaType != MEDIATYPE_OCI_MANIFEST_V1
-      && manifest.mediaType != MEDIATYPE_MANIFEST_V2) {
-    throw new Error(`Received manifest of unsupported type "${manifest.mediaType}. Is this actually a Denodir artifact, or just a normal Docker image?`);
-  }
+  const descriptor = await puller.resolveRef(ref);
 
-  const manifestDigest = manifestResp.headers.get('docker-content-digest');
-  if (!manifestDigest?.startsWith('sha256:')) {
-    throw new Error(`Received manifest with weird digest "${manifestDigest}`);
-  }
-
-  for (const layer of [manifest.config, ...manifest.layers]) {
-    const layerStat = await store.statLayer('blob', layer.digest);
-    if (layerStat) {
-      if (layerStat.size !== layer.size) {
-        throw new Error(`Digest ${layer.digest} clashed (size: ${layerStat.size} vs ${layer.size}). This isn't supposed to happen`);
-      }
-      console.error('   ', 'Layer', layer.digest, 'is already present on disk');
-    } else {
-      console.error('   ', 'Need to download', layer.digest, '...');
-      await store.putLayerFromStream('blob', layer, await client
-        .getBlobStream(layer.digest)
-        .then(stream => stream
-          .pipeThrough(showStreamProgress(layer.size))));
-      console.error('-->', 'Layer', layer.digest, 'downloaded!');
-    }
-  }
-
-  const manifestDescriptor = await store.putLayerFromBytes('manifest', {
-    mediaType: manifest.mediaType,
-    digest: manifestDigest,
-    annotations: {
-      'vnd.denodir.origin': rar.canonicalName ?? '',
-    },
-  }, await manifestResp.dockerBody());
-
-  console.error('==>', 'Pull complete!', manifestDescriptor.digest);
   return {
-    descriptor: manifestDescriptor,
+    descriptor: await puller.pullArtifact(descriptor),
     reference: rar,
   };
+}
+
+class ArtifactPuller {
+  constructor(
+    private readonly sourceStore: OciStore.Api,
+    private readonly targetStore: OciStore.Api,
+    public readonly image: RegistryRepo,
+  ) {}
+
+  static async makeForReference(targetStore: OciStore.Api, image: RegistryRepo) {
+    const client = await OciStore.registry(image, ['pull']);
+    return new ArtifactPuller(client, targetStore, image);
+  }
+
+  async readManifest(digestOrTag: string) {
+    const blob = await this.sourceStore.getFullLayer('manifest', digestOrTag);
+    const json: Manifest = JSON.parse(new TextDecoder().decode(blob));
+    return {bytes: blob, json};
+  }
+
+  async resolveRef(ref: string) {
+    const stat = await this.sourceStore.describeManifest(ref);
+    if (!stat?.digest) throw new Error(`Failed to resolve remote ref ${ref}`);
+    return stat;
+  }
+
+  async pullArtifact(descriptor: ManifestOCIDescriptor) {
+    if (descriptor.mediaType == MEDIATYPE_MANIFEST_LIST_V2
+        || descriptor.mediaType == MEDIATYPE_OCI_MANIFEST_INDEX_V1) {
+      return await this.pullList(descriptor);
+    }
+
+    if (descriptor.mediaType != MEDIATYPE_OCI_MANIFEST_V1
+        && descriptor.mediaType != MEDIATYPE_MANIFEST_V2) {
+      throw new Error(`Received manifest of unsupported type "${descriptor.mediaType}. Is this actually a Denodir artifact, or just a normal Docker image?`);
+    }
+
+    return await this.pullImage(descriptor);
+  }
+
+  async pullList(descriptor: ManifestOCIDescriptor) {
+    const manifest = await this.readManifest(descriptor.digest);
+
+    const indexManifest = manifest.json as ManifestOCIIndex;
+    for (const childManifest of indexManifest.manifests) {
+      await this.pullImage(childManifest);
+    }
+
+    const result = await this.targetStore.putLayerFromBytes('manifest', {
+      mediaType: manifest.json.mediaType ?? descriptor.mediaType,
+      digest: descriptor.digest,
+      annotations: {
+        ...descriptor.annotations,
+        'vnd.denodir.origin': this.image.canonicalName ?? '',
+      },
+    }, manifest.bytes);
+
+    console.error('==>', `Pull of ${indexManifest.manifests.length} images complete!`, descriptor.digest);
+    return result;
+  }
+
+  async pullImage(descriptor: ManifestOCIDescriptor) {
+    const manifest = await this.readManifest(descriptor.digest);
+
+    if (manifest.json.mediaType != MEDIATYPE_OCI_MANIFEST_V1
+        && manifest.json.mediaType != MEDIATYPE_MANIFEST_V2) {
+      throw new Error(`Received manifest of unsupported type "${manifest.json.mediaType}. Is this actually a normal container image?`);
+    }
+
+    for (const layer of [manifest.json.config, ...manifest.json.layers]) {
+      const layerStat = await this.targetStore.statLayer('blob', layer.digest);
+      if (layerStat) {
+        if (layerStat.size !== layer.size) {
+          throw new Error(`Digest ${layer.digest} clashed (size: ${layerStat.size} vs ${layer.size}). This isn't supposed to happen`);
+        }
+        console.error('   ', 'Layer', layer.digest, 'is already present on disk');
+      } else {
+        console.error('   ', 'Need to download', layer.digest, '...');
+        await this.targetStore.putLayerFromStream('blob', layer, await this.sourceStore
+          .getLayerStream('blob', layer.digest)
+          .then(stream => stream
+            .pipeThrough(showStreamProgress(layer.size))));
+        console.error('-->', 'Layer', layer.digest, 'downloaded!');
+      }
+    }
+
+    const result = await this.targetStore.putLayerFromBytes('manifest', {
+      mediaType: manifest.json.mediaType,
+      digest: descriptor.digest,
+      annotations: {
+        ...descriptor.annotations,
+        'vnd.denodir.origin': this.image.canonicalName ?? '',
+      },
+    }, manifest.bytes);
+
+    console.error('==>', 'Pull complete!', descriptor.digest);
+    return result;
+  }
 }
 
 function showStreamProgress(totalSize: number) {

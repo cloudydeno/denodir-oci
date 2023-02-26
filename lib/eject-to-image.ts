@@ -36,7 +36,8 @@ export async function ejectToImage(opts: {
       schemaVersion: 2,
       mediaType: MEDIATYPE_OCI_MANIFEST_INDEX_V1,
       annotations: opts.annotations,
-      manifests: await Promise.all(baseManifest.manifests
+      manifests: await Promise.all((<ManifestOCIIndex>baseManifest).manifests
+        .filter(archManifest => archManifest.platform?.os !== 'unknown') // remove attestation-manifests
         .map(archManifest =>
           ejectToImage({ ...opts,
             baseDigest: archManifest.digest,
@@ -55,10 +56,10 @@ export async function ejectToImage(opts: {
 
   const dociManifest: ManifestOCI = JSON.parse(new TextDecoder().decode(await opts.store.getFullLayer('manifest', opts.dociDigest)));
 
-  const baseConfiig: OciImageConfig = JSON.parse(new TextDecoder().decode(await opts.store.getFullLayer('blob', baseManifest.config.digest)));
+  const baseConfig: OciImageConfig = JSON.parse(new TextDecoder().decode(await opts.store.getFullLayer('blob', baseManifest.config.digest)));
   const dociConfig: DenodirArtifactConfig = JSON.parse(new TextDecoder().decode(await opts.store.getFullLayer('blob', dociManifest.config.digest)));
 
-  const configWriter = new ImageConfigWriter(baseConfiig, `cloudydeno.denodir-oci.v0`);
+  const configWriter = new ImageConfigWriter(baseConfig, `cloudydeno.denodir-oci.v0`);
 
   const knownDenodir = configWriter.getEnv('DENO_DIR');
   if (knownDenodir !== '/denodir') {

@@ -12,12 +12,16 @@ export class OciStoreInmem implements OciStoreApi {
     manifest: new Map<string, Uint8Array>(),
   };
 
-  putLayerFromFile(flavor: "blob"|"manifest",descriptor: ManifestOCIDescriptor,sourcePath: string): Promise<ManifestOCIDescriptor> {
+  putLayerFromFile(flavor: "blob" | "manifest", descriptor: ManifestOCIDescriptor, sourcePath: string): Promise<ManifestOCIDescriptor> {
     throw new Error("Method not implemented.");
   }
-  putLayerFromStream(flavor: "blob"|"manifest",descriptor: ManifestOCIDescriptor,stream: ReadableStream<Uint8Array>): Promise<ManifestOCIDescriptor> {
+  putLayerFromStream(flavor: "blob" | "manifest", descriptor: ManifestOCIDescriptor, stream: ReadableStream<Uint8Array>): Promise<ManifestOCIDescriptor> {
     throw new Error("Method not implemented.");
   }
+  describeManifest(reference: string): Promise<ManifestOCIDescriptor> {
+    throw new Error("Method not implemented.");
+  }
+
   async putLayerFromBytes(
     flavor: 'blob' | 'manifest',
     descriptor: Omit<ManifestOCIDescriptor, 'digest' | 'size'> & { digest?: string },
@@ -44,18 +48,19 @@ export class OciStoreInmem implements OciStoreApi {
     };
   }
 
-  statLayer(flavor: "blob"|"manifest",digest: string): Promise<{ size: number; }|null> {
+  statLayer(flavor: "blob" | "manifest", digest: string): Promise<{ size: number; } | null> {
     const data = this.storage[flavor].get(digest);
     return Promise.resolve(data ? {
       size: data.byteLength,
     } : null);
   }
-  getFullLayer(flavor: "blob"|"manifest",digest: string): Promise<Uint8Array> {
+  getFullLayer(flavor: "blob" | "manifest", digest: string): Promise<Uint8Array> {
     const data = this.storage[flavor].get(digest);
-    if (!data) throw new Deno.errors.NotFound(`Inmem store lacks ${flavor} ${digest}`);
+    if (!data)
+      throw new Deno.errors.NotFound(`Inmem store lacks ${flavor} ${digest}`);
     return Promise.resolve(data);
   }
-  async getLayerStream(flavor: "blob"|"manifest",digest: string): Promise<ReadableStream<Uint8Array>> {
+  async getLayerStream(flavor: "blob" | "manifest", digest: string): Promise<ReadableStream<Uint8Array>> {
     const data = await this.getFullLayer(flavor, digest);
     return new StreamBuffer(data).readable;
   }

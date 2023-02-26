@@ -1,11 +1,7 @@
 import {
   assertEquals,
-  copy,
   ManifestOCIDescriptor,
   path,
-  readerFromIterable,
-  Untar,
-  writeAll,
 } from "../../deps.ts";
 import { OciStoreApi } from "./_api.ts";
 import { sha256bytesToHex } from "../util/digest.ts";
@@ -25,6 +21,10 @@ export class OciStoreLocal implements OciStoreApi {
     await Deno.mkdir(path.join(this.rootPath, 'blobs', 'sha256'), {recursive: true});
     await Deno.mkdir(path.join(this.rootPath, 'manifests', 'sha256'), {recursive: true});
     // await Deno.mkdir(path.join(this.rootPath, 'references'), {recursive: true});
+  }
+
+  describeManifest(reference: string): Promise<ManifestOCIDescriptor> {
+    throw new Error("Method not implemented.");
   }
 
   async putLayerFromFile(

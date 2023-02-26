@@ -26,6 +26,8 @@ export interface OciStoreApi {
     size: number;
   } | null>;
 
+  describeManifest(reference: string): Promise<ManifestOCIDescriptor>;
+
   getFullLayer(flavor: 'blob' | 'manifest', digest: string): Promise<Uint8Array>;
 
   getLayerStream(flavor: 'blob' | 'manifest', digest: string): Promise<ReadableStream<Uint8Array>>;

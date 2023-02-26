@@ -47,9 +47,44 @@ export class OciRegistry implements OciStoreApi {
   putLayerFromBytes(flavor: "blob"|"manifest",descriptor: Omit<ManifestOCIDescriptor,"digest"|"size">&{ digest?: string|undefined; },rawData: Uint8Array): Promise<ManifestOCIDescriptor> {
     throw new Error("Method not implemented.");
   }
-  statLayer(flavor: "blob"|"manifest",digest: string): Promise<{ size: number; }|null> {
-    throw new Error("Method not implemented.");
+  async statLayer(flavor: "blob"|"manifest", ref: string): Promise<{ size: number; digest: string }|null> {
+    if (flavor == 'blob') {
+      const resp = await this.api.headBlob({ digest: ref });
+      console.log({headers:resp[0].headers})
+      throw new Error("Method not implemented.");
+    }
+    if (flavor == 'manifest') {
+      // TODO: this should only be a HEAD request; needs library support
+      const {resp} = await this.api.getManifest({ ref });
+      const contentLength = resp.headers.get('content-length');
+      const contentDigest = resp.headers.get('docker-content-digest');
+      if (!contentLength || !contentDigest) throw new Error(`Registry didn't give length/digest`);
+      return {
+        size: parseInt(contentLength),
+        digest: contentDigest,
+      };
+    }
+    throw new Error("Flavor not implemented.");
   }
+
+  async describeManifest(reference: string): Promise<ManifestOCIDescriptor> {
+    // TODO: this should only be a HEAD request; needs library support
+    const {resp} = await this.api.getManifest({ ref: reference });
+    // if (resp.status == 404)
+
+    const contentType = resp.headers.get('content-type');
+    const contentLength = resp.headers.get('content-length');
+    const contentDigest = resp.headers.get('docker-content-digest');
+    if (!contentType || !contentLength || !contentDigest) throw new Error(
+      `Registry didn't give type/length/digest headers for ${reference}`);
+
+    return {
+      mediaType: contentType,
+      size: parseInt(contentLength),
+      digest: contentDigest,
+    };
+  }
+
   async getFullLayer(flavor: "blob"|"manifest",digest: string): Promise<Uint8Array> {
     if (flavor == 'blob') {
       const resps = await this.api._headOrGetBlob('GET', digest)
@@ -63,14 +98,14 @@ export class OciRegistry implements OciStoreApi {
       });
       return await resp.dockerBody();
     }
-    throw new Error("Method not implemented.");
+    throw new Error("Flavor not implemented.");
   }
   async getLayerStream(flavor: "blob"|"manifest",digest: string): Promise<ReadableStream<Uint8Array>> {
     if (flavor == 'blob') {
       const bundle = await this.api.createBlobReadStream({digest});
       return bundle.stream;
     }
-    throw new Error("Method not implemented.");
+    throw new Error("Flavor not implemented.");
   }
 }
 

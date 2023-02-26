@@ -48,6 +48,10 @@ export class StackedStore implements OciStoreApi {
     return await this.firstReadWithout404(store =>
       store.statLayer(flavor, digest));
   }
+  async describeManifest(reference: string) {
+    return await this.firstReadWithout404(store =>
+      store.describeManifest(reference));
+  }
 
   // Write methods
 
