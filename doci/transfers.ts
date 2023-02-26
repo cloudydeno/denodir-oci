@@ -15,12 +15,12 @@ import {
 import * as OciStore from "../lib/store.ts";
 import { OciRegistry } from "../lib/store/registry.ts";
 
-export async function pushFullArtifact(sourceStore: OciStore.Api, manifestDigest: string, destination: string) {
+export async function pushFullArtifact(sourceStore: OciStore.Api, manifestDigest: string, destination: string, forceTag?: string) {
   const manifestRaw = await sourceStore.getFullLayer('manifest', manifestDigest);
   const manifest: ManifestOCI | ManifestOCIIndex = JSON.parse(new TextDecoder().decode(manifestRaw));
 
   var rar = parseRepoAndRef(destination);
-  const ref = rar.tag ?? rar.digest;
+  const ref = forceTag ?? rar.tag ?? rar.digest;
   if (!ref) throw 'No desired tag or digest found';
 
   const client = await OciStore.registry(rar, ['pull', 'push']);

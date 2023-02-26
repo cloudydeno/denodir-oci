@@ -136,15 +136,17 @@ export const pushCommand = defineCommand({
   name: 'push',
   description: `Pushes a previously built artifact, optionally combined with a base image`,
   args: {
-    target: {
-      nargs: '1',
-      description: `A registry to push the image to.`,
-    },
   },
   flags: {
     ...commonFlags,
-    eject: {
+    target: {
+      short: 't',
       typeFn: String,
+      description: `Use a named target from the project's configuration file`,
+    },
+    tag: {
+      typeFn: String,
+      description: `Provide a specific tag for the published image, such as a commit hash`,
     },
   },
   async run(args, flags) {
@@ -157,15 +159,18 @@ export const pushCommand = defineCommand({
       `No digest found for ${fullPath}`;
     console.error(`Using known digest`, knownDigest);
 
-    if (!flags.eject) {
-      await pushFullArtifact(await OciStore.local(), knownDigest, args.target);
+    if (!flags.target) throw die
+      `Please specify a target from config file ${flags.config}`;
+    const target: DociConfigTarget | undefined = config.targets?.[flags.target ?? ''];
+    if (!target) throw die
+      `Target ${flags.target} not found in config file ${flags.config}`;
+
+    if (!target.baseRef) {
+      await pushFullArtifact(await OciStore.local(), knownDigest, target.ref, flags.tag);
 
     } else {
-      const ejectBase = config.ejections?.[flags.eject];
-      if (!ejectBase) throw `No ejection config found for ${flags.eject}`;
-
       const {ejected, store} = await ejectArtifact({
-        baseRef: ejectBase.base,
+        baseRef: target.baseRef,
         digest: knownDigest,
 
         baseStore: await OciStore.local('base-storage'),
@@ -173,7 +178,7 @@ export const pushCommand = defineCommand({
         stagingStore: OciStore.inMemory(),
       });
 
-      await pushFullArtifact(store, ejected.digest, args.target);
+      await pushFullArtifact(store, ejected.digest, target.ref, flags.tag);
     }
   }});
 
