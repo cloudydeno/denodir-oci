@@ -12,9 +12,9 @@ A reference of some modules that I've been building as test material.
 ### Tiny examples
 
 ```sh
-doci build https://deno.land/std@0.122.0/examples/welcome.ts # A single file
-doci build https://deno.land/std@0.122.0/examples/colors.ts # Two files
-doci build https://deno.land/std@0.122.0/examples/flags.ts # Three files
+doci build https://deno.land/std@0.177.0/examples/welcome.ts # A single file
+doci build https://deno.land/std@0.177.0/examples/colors.ts # Two files
+doci build https://deno.land/std@0.177.0/examples/flags.ts # Three files
 ```
 
 ### Large images
