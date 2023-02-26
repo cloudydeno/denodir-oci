@@ -43,16 +43,16 @@ jobs:
       run: |
         time ./doci/mod.ts pipeline build --config registry/examples/colors.yaml
         time ./doci/mod.ts pipeline export --config registry/examples/colors.yaml --target alpine | docker load
-        docker run --rm --read-only deno.dir/examples/colors
+        time docker run --rm --read-only deno.dir/examples/colors
 
     - name: Build example artifacts - flags
       run: |
         time ./doci/mod.ts pipeline build --config registry/examples/flags.yaml
         time ./doci/mod.ts pipeline export --config registry/examples/flags.yaml --target alpine | docker load
-        docker run --rm --read-only deno.dir/examples/flags --hello=world yup
+        time docker run --rm --read-only deno.dir/examples/flags --hello=world yup
 
     - name: Build example artifacts - welcome
       run: |
         time ./doci/mod.ts pipeline build --config registry/examples/welcome.yaml
         time ./doci/mod.ts pipeline export --config registry/examples/welcome.yaml --target alpine | docker load
-        docker run --rm --read-only deno.dir/examples/welcome
+        time docker run --rm --read-only deno.dir/examples/welcome
