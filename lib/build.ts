@@ -263,13 +263,13 @@ export async function buildDenodirLayer(opts: {
         mtime: 0,
       });
 
-      if (opts.includeBuildInfo && rootSpecifier == (data.redirects[module.specifier] ?? module.specifier)) {
-        const buildInfoPath = module.emit.replace(/\.[^.]+$/, '.buildinfo');
-        await tar.append(emitPath+'.buildinfo', {
-          filePath: buildInfoPath,
-          mtime: 0,
-        });
-      }
+      // if (opts.includeBuildInfo && rootSpecifier == (data.redirects[module.specifier] ?? module.specifier)) {
+      //   const buildInfoPath = module.emit.replace(/\.[^.]+$/, '.buildinfo');
+      //   await tar.append(emitPath+'.buildinfo', {
+      //     filePath: buildInfoPath,
+      //     mtime: 0,
+      //   });
+      // }
     }
   }
 

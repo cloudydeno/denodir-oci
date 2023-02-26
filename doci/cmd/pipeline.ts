@@ -1,5 +1,6 @@
 import {
   defineCommand,
+  parseRepoAndRef,
   parseYaml,
   path,
 } from "../../deps.ts";
@@ -160,8 +161,11 @@ export const pushCommand = defineCommand({
       await pushFullArtifact(await OciStore.local(), knownDigest, args.target);
 
     } else {
+      const ejectBase = config.ejections?.[flags.eject];
+      if (!ejectBase) throw `No ejection config found for ${flags.eject}`;
+
       const {ejected, store} = await ejectArtifact({
-        baseRef: flags.eject,
+        baseRef: ejectBase.base,
         digest: knownDigest,
 
         baseStore: await OciStore.local('base-storage'),

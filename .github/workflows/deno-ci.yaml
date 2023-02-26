@@ -13,9 +13,9 @@ jobs:
     strategy:
       matrix:
         deno-version:
-        # v1.18 and earlier lack Deno.FsFile for std/archive/tar.ts
-        - v1.19
         - v1.20
+        - v1.25
+        - v1.30
         - canary
       fail-fast: false # run each branch to completion
 
@@ -37,7 +37,7 @@ jobs:
         restore-keys: deno-https/v1-
 
     - name: Check doci/mod.ts
-      run: time deno cache doci/mod.ts
+      run: time deno check doci/mod.ts
 
     - name: Build example artifacts - colors
       run: |
