@@ -183,7 +183,7 @@ export async function ejectArtifact(opts: {
   // Pull base manifest
   // TODO: can skip pulling if we already have a version of the manifest (by digest?)
   const baseImage = await pullFullArtifact(opts.baseStore,
-    opts.baseRef.replace('$DenoVersion', Deno.version.deno));
+    opts.baseRef.replace('$DenoVersion', Deno.version.deno.replace(/\+.+$/, '')));
 
   // Inmemory store for the generated manifest
   const storeStack = OciStore.stack({
