@@ -73,9 +73,13 @@ export class BuildContext {
 
   /** Helper to run "deno cache" and make sure it succeeds */
   async cacheSpecifier(specifier: string, runtimeFlags?: string[]) {
+    const allowImports = runtimeFlags?.filter(x =>
+      x.startsWith('--allow-import=')
+      || x == '--allow-import');
     const cacheFlags = [
-      ...(runtimeFlags?.includes('--unstable') ? ['--unstable'] : []),
-      ...(runtimeFlags?.includes('--no-check') ? ['--no-check'] : []),
+      ...runtimeFlags?.includes('--unstable') ? ['--unstable'] : [],
+      ...runtimeFlags?.includes('--no-check') ? ['--no-check'] : [],
+      ...allowImports ?? [],
     ];
     console.error('+', 'deno', 'cache', ...cacheFlags, '--', specifier);
     const proc = Deno.run({
