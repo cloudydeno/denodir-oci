@@ -31,7 +31,7 @@ export const exportCommand = defineCommand({
     if (flags.format !== 'docker' && flags.format !== 'oci' && flags.format !== 'auto') throw die
       `--format needs to be "docker" or "oci" or "auto", not ${flags.format}`;
 
-    if (Deno.isatty(Deno.stdout.rid)) throw die
+    if (Deno.stdout.isTerminal()) throw die
       `Refusing to write a tarball to a TTY, please redirect stdout`;
 
     await exportTarArchive({

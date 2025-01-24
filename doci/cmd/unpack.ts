@@ -32,7 +32,8 @@ export const unpackCommand = defineCommand({
     try {
       for await (const item of Deno.readDir(flags.destination)) throw die
         `The destination folder ${flags.destination} is not empty, I saw ${item.name}`;
-    } catch (err) {
+    } catch (thrown) {
+      const err = thrown as Error;
       throw die
         `The destination folder ${flags.destination} could not be read: ${err.message}`;
     }

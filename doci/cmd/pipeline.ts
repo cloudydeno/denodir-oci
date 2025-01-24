@@ -103,7 +103,7 @@ export const exportCommand = defineCommand({
       `--format needs to be "docker" or "oci" or "auto", not ${flags.format}`;
 
     flags.output ??= '-';
-    if (flags.output == '-' && Deno.isatty(Deno.stdout.rid)) throw die
+    if (flags.output == '-' && Deno.stdout.isTerminal()) throw die
       `Refusing to write a tarball to a TTY, please redirect stdout`;
 
     const fullPath = path.resolve(config.entrypoint.specifier);

@@ -90,7 +90,7 @@ export async function runArtifact(opts: {
 
   const tempDir = await Deno.makeTempDir({prefix: 'denodir-run-'});
   // console.error({ tempDir });
-  let status: Deno.ProcessStatus | null = null;
+  let exitCode = 0;
   try {
 
     for (const layer of manifest.layers) {
@@ -102,8 +102,7 @@ export async function runArtifact(opts: {
       }
     }
 
-    const denoCmd = [
-      Deno.execPath(),
+    const denoArgs = [
       'run',
       '--cached-only',
       ...configData.runtimeFlags,
@@ -112,26 +111,28 @@ export async function runArtifact(opts: {
       configData.entrypoint,
       ...opts.scriptFlags,
     ];
-    console.error('+', denoCmd
+
+    console.error('+', 'deno', denoArgs
       .map(x => /^[a-z0-9._-]+$/i.test(x) ? x : JSON.stringify(x))
       .join(' '));
-    const proc = Deno.run({
-      cmd: denoCmd,
+
+    // Wait for the child process to exit
+    const proc = await new Deno.Command(Deno.execPath(), {
+      args: denoArgs,
       env: {
         'DENO_DIR': path.join(tempDir, 'denodir'),
         ...(opts.environmentVariables ?? {}),
       },
-    })
+    }).output();
 
-    // Wait for the child process to exit
-    status = await proc.status();
+    exitCode = proc.code || 1;
 
   } finally {
     await Deno.remove(tempDir, {recursive: true});
   }
 
-  if (status?.success == false) {
-    Deno.exit(status.code);
+  if (exitCode) {
+    Deno.exit(exitCode);
   }
 }
 

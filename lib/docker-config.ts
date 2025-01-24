@@ -68,25 +68,29 @@ class DockerCredentialHelper {
   log: (message: string) => void;
 
   private async exec<T=unknown>(subcommand: string, stdin: string): Promise<T | null> {
-    const proc = Deno.run({
-      cmd: [`docker-credential-${this.name}`, subcommand],
+    const command = new Deno.Command(`docker-credential-${this.name}`, {
+      args: [subcommand],
       stdin: 'piped',
       stdout: 'piped',
     });
+    const proc = command.spawn();
 
     if (stdin) {
-      await writeAll(proc.stdin, new TextEncoder().encode(stdin));
+      const writer = proc.stdin.getWriter();
+      await writer.write(new TextEncoder().encode(stdin));
+      writer.releaseLock();
     }
     proc.stdin.close();
 
-    const stdout = await new Response(proc.stdout.readable).text();
+    const result = await proc.output();
+
+    if (!result.success) throw new Error(
+      `Docker credential helper "${this.name}" failed at "${subcommand}"!`);
+
+    const stdout = new TextDecoder().decode(result.stdout);
     if (stdout.includes('credentials not found')) {
       return null;
     }
-
-    const status = await proc.status();
-    if (!status.success) throw new Error(
-      `Docker credential helper "${this.name}" failed at "${subcommand}"!`);
 
     return JSON.parse(stdout);
   }

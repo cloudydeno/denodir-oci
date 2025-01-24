@@ -82,14 +82,13 @@ export class BuildContext {
       ...allowImports ?? [],
     ];
     console.error('+', 'deno', 'cache', ...cacheFlags, '--', specifier);
-    const proc = Deno.run({
-      cmd: ['deno', 'cache', ...cacheFlags, '--', specifier],
+    const proc = await new Deno.Command('deno', {
+      args: ['cache', ...cacheFlags, '--', specifier],
       stdin: 'null',
-    });
+    }).output();
 
-    const status = await proc.status();
-    if (!status.success) throw new Error(
-      `"deno cache" failed, exit code ${status.code}`);
+    if (!proc.success) throw new Error(
+      `"deno cache" failed, exit code ${proc.code}`);
   }
 }
 
@@ -113,14 +112,13 @@ export async function buildDenodirLayer(opts: {
     `When passed, localFileRoot needs to be an absolute path.`);
 
   console.error('+', 'deno', 'info', '--json', '--', opts.specifier);
-  const proc = Deno.run({
-    cmd: ['deno', 'info', '--json', '--', opts.specifier],
+  const proc = await new Deno.Command('deno', {
+    args: ['info', '--json', '--', opts.specifier],
     stdin: 'null',
     stdout: 'piped',
-  });
-  const raw = await new Response(proc.stdout.readable).text();
-  const status = await proc.status();
-  if (!status.success) throw 'deno info failed';
+  }).output();
+  if (!proc.success) throw 'deno info failed';
+  const raw = new TextDecoder().decode(proc.stdout);
 
   const data = JSON.parse(raw) as ModuleGraphJson;
 
