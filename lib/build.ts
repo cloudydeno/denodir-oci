@@ -85,6 +85,8 @@ export class BuildContext {
     const proc = await new Deno.Command('deno', {
       args: ['cache', ...cacheFlags, '--', specifier],
       stdin: 'null',
+      stdout: 'inherit',
+      stderr: 'inherit',
     }).output();
 
     if (!proc.success) throw new Error(
@@ -116,6 +118,7 @@ export async function buildDenodirLayer(opts: {
     args: ['info', '--json', '--', opts.specifier],
     stdin: 'null',
     stdout: 'piped',
+    stderr: 'inherit',
   }).output();
   if (!proc.success) throw 'deno info failed';
   const raw = new TextDecoder().decode(proc.stdout);
