@@ -186,15 +186,6 @@ export async function buildDenodirLayer(opts: {
 
   const tar = new Tar();
 
-  for (const [fromUrl, toUrl] of Object.entries(data.redirects)) {
-    if (!toUrl.startsWith('https://crux.land/api/get/')) continue;
-    const url = new URL(toUrl);
-    if (!url.pathname.includes('.')) continue;
-    const midUrl = toUrl.replace(/\.[^.]+$/, '');
-    data.redirects[fromUrl] = midUrl;
-    data.redirects[midUrl] = toUrl;
-  }
-
   // Need to explicitly capture redirections
   for (const [fromUrl, toUrl] of Object.entries(data.redirects)) {
     const url = new URL(fromUrl);
