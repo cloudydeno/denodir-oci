@@ -196,12 +196,8 @@ export async function buildDenodirLayer(opts: {
 
     await tar.append('denodir/'+cachePath.slice(prefixLength), {
       filePath: cachePath,
-      mtime: 0,
-    });
-    await tar.append('denodir/'+cachePath.slice(prefixLength)+'.metadata.json', {
-      // filePath: cachePath+'.metadata.json',
-      ...await cleanDepsMeta(cachePath+'.metadata.json'),
-      mtime: 0,
+      // ...await cleanDepsMeta(cachePath),
+      // mtime: 0,
     });
 
   }
@@ -216,11 +212,20 @@ export async function buildDenodirLayer(opts: {
 
     if (!module.local) throw new Error(`Module ${module.specifier} not local`);
     if (module.local.startsWith(prefix)) {
+      // TODO: clean the metadata - the gen metadata is a set of complex deno hashes
       await tar.append('denodir/'+module.local.slice(prefixLength), {
-        // filePath: module.local,
-        ...await cleanDepsMeta(module.local),
-        mtime: 0,
+        filePath: module.local,
+        // ...await cleanDepsMeta(module.local),
+        // mtime: 0,
       });
+      if (module.mediaType == 'TypeScript') {
+        const genSubpath = module.local.slice(prefixLength).replace(/^remote/, 'gen');
+        await tar.append('denodir/'+genSubpath, {
+          filePath: prefix+genSubpath,
+          // ...await cleanDepsMeta(prefix+genSubpath),
+          // mtime: 0,
+        });
+      }
     } else if (module.specifier.startsWith('file://')) {
       // Move file:// modules into /denodir/deps/file/
       // TODO: consider rewriting file://... modules underneath https://denodir/ ?
