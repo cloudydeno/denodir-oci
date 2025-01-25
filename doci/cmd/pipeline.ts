@@ -221,8 +221,8 @@ export const pushCommand = defineCommand({
       if (!target) throw die
         `Target ${flags.target} not found in config file ${flags.config}`;
 
-      const localStorage = await OciStore.local('storage');
-      let originStorage: OciStoreApi = localStorage;
+      const localStore = await OciStore.local('storage');
+      let originStore: OciStoreApi = localStore;
       let originDigest = knownDigest;
 
       // Perform an ejection if requested
@@ -232,17 +232,17 @@ export const pushCommand = defineCommand({
           digest: knownDigest,
 
           baseStore: await OciStore.local('base-storage'),
-          dociStore: localStorage,
+          dociStore: localStore,
           stagingStore: OciStore.inMemory(),
         });
 
-        originStorage = store;
+        originStore = store;
         originDigest = ejected.digest;
       }
 
       for (const destination of (flags.destinations ?? '').split(/\W+/)) {
         const [ref, tag] = destination.split(':');
-        await pushFullArtifact(originStorage, originDigest, ref, tag);
+        await pushFullArtifact(originStore, originDigest, ref, tag);
       }
     }});
 
