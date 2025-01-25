@@ -12,6 +12,12 @@ jobs:
 
   check:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+
     name: Check w/ ${{ matrix.deno-version }}
     strategy:
       matrix:
