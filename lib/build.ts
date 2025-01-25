@@ -191,7 +191,7 @@ export async function buildDenodirLayer(opts: {
     const url = new URL(fromUrl);
     const hashString = url.pathname + url.search;
     // TODO: nonstandard port is _PORT or something
-    const cachePath = path.join(prefix, 'deps',
+    const cachePath = path.join(prefix, 'remote',
       url.protocol.replace(/:$/, ''),
       url.hostname,
       await sha256string(hashString));
