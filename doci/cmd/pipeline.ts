@@ -66,6 +66,19 @@ export const buildCommand = defineCommand({
 
     const fullPath = path.resolve(config.entrypoint.specifier);
     localStorage.setItem(`specifier_${fullPath}`, finalDigest);
+
+    const githubOutput = Deno.env.get('GITHUB_OUTPUT');
+    if (githubOutput) {
+      const file = await Deno.open(githubOutput, {
+        write: true,
+        append: true,
+      });
+      const writer = file.writable.getWriter();
+      await writer.write(new TextEncoder().encode(`digest=${finalDigest}`));
+      writer.close();
+      console.error(`Step output: digest=${finalDigest}`);
+    }
+
   }});
 
 export const exportCommand = defineCommand({
@@ -232,6 +245,18 @@ export const pushCommand = defineCommand({
 
         originStore = store;
         originDigest = ejected.digest;
+      }
+
+      const githubOutput = Deno.env.get('GITHUB_OUTPUT');
+      if (githubOutput) {
+        const file = await Deno.open(githubOutput, {
+          write: true,
+          append: true,
+        });
+        const writer = file.writable.getWriter();
+        await writer.write(new TextEncoder().encode(`digest=${originDigest}`));
+        writer.close();
+        console.error(`Step output: digest=${originDigest}`);
       }
 
       for (const destination of params.destinations) {
