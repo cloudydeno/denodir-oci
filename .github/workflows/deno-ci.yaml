@@ -130,7 +130,7 @@ jobs:
           doci_target: alpine
           doci_destinations: ${{ steps.meta.outputs.tags }}
           doci_labels: ${{ steps.meta.outputs.labels }}
-        run: doci pipeline push-all --target $doci_target --destinations $doci_destinations --labels $doci_labels
+        run: doci pipeline push-all
 
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v2
