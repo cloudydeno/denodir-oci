@@ -167,9 +167,9 @@ export async function buildDenodirLayer(opts: {
     if (!module.local) throw new Error(`Module ${module.specifier} not in local`);
   }
 
-  const firstLocal = data.modules.find(x => x.local);
+  const firstLocal = data.modules.find(x => x.local?.includes('/remote/'));
   if (!firstLocal?.local) throw new Error(`No firstLocal found`);
-  const prefixLength = firstLocal.local.indexOf('/gen/') + 1;
+  const prefixLength = firstLocal.local.indexOf('/remote/') + 1;
   const prefix = firstLocal.local.slice(0, prefixLength);
 
   const tar = new Tar();
@@ -219,7 +219,8 @@ export async function buildDenodirLayer(opts: {
         // mtime: 0,
       });
       if (module.mediaType == 'TypeScript') {
-        const genSubpath = module.local.slice(prefixLength).replace(/^remote/, 'gen');
+        const genSubpath = module.local.slice(prefixLength).replace(/^remote/, 'gen')+'.js';
+        if (prefix+genSubpath == module.local) throw new Error(`failed to get gen path for ${genSubpath}`);
         await tar.append('denodir/'+genSubpath, {
           filePath: prefix+genSubpath,
           // ...await cleanDepsMeta(prefix+genSubpath),
