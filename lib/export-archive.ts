@@ -54,7 +54,10 @@ export async function exportArtifactAsArchive(opts: {
 
     const selectedManifest = manifestData.manifests.find(archManifest => {
       if (archManifest.platform?.os === 'unknown') return false;
-      if (archManifest.platform?.architecture == 'arm64' && Deno.build.arch == 'x86_64') {
+      if (archManifest.platform?.architecture == 'arm64' && Deno.build.arch == 'aarch64') {
+        return true;
+      }
+      if (archManifest.platform?.architecture == 'amd64' && Deno.build.arch == 'x86_64') {
         return true;
       }
     })
