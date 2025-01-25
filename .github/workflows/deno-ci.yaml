@@ -117,7 +117,10 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=sha
+            type=ref,event=pr
+            type=ref,event=tag
             type=edge,branch=main
+
       - name: Show desired metadata
         env:
           tags: ${{ steps.meta.outputs.tags }}
@@ -130,8 +133,12 @@ jobs:
         id: build
         run: echo "digest=$(doci pipeline build -o digest)\n" >> $GITHUB_OUTPUT
 
-      - name: Push alpine image
-        run: doci pipeline push-all --target alpine --destinations "${{ steps.name.outputs.tags }}" --labels "${{ steps.name.outputs.labels }}"
+      - name: Push alpine tags
+        env:
+          doci_target: alpine
+          doci_destinations: ${{ steps.meta.outputs.tags }}
+          doci_labels: ${{ steps.meta.outputs.labels }}
+        run: doci pipeline push-all --target $doci_target --destinations $doci_destinations --labels $doci_labels
 
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v2
