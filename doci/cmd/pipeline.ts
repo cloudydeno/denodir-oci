@@ -7,6 +7,7 @@ import {
 import * as OciStore from "../../lib/store.ts";
 import { pushFullArtifact } from "../transfers.ts";
 import { buildSimpleImage, die, ejectArtifact, exportTarArchive } from "../actions.ts";
+import { OciStoreApi } from "../../lib/store/_api.ts";
 
 interface DociConfigLayer {
   specifier: string;
@@ -65,6 +66,19 @@ export const buildCommand = defineCommand({
 
     const fullPath = path.resolve(config.entrypoint.specifier);
     localStorage.setItem(`specifier_${fullPath}`, finalDigest);
+
+    const githubOutput = Deno.env.get('GITHUB_OUTPUT');
+    if (githubOutput) {
+      const file = await Deno.open(githubOutput, {
+        write: true,
+        append: true,
+      });
+      const writer = file.writable.getWriter();
+      await writer.write(new TextEncoder().encode(`digest=${finalDigest}`));
+      writer.close();
+      console.error(`Step output: digest=${finalDigest}`);
+    }
+
   }});
 
 export const exportCommand = defineCommand({
@@ -181,6 +195,76 @@ export const pushCommand = defineCommand({
     }
   }});
 
+  export const pushAllCommand = defineCommand({
+    name: 'push-all',
+    description: `Pushes the same artifact from GHA to multiple places`,
+    args: {
+    },
+    flags: {
+      ...commonFlags,
+    },
+    async run(args, flags) {
+
+      const params = {
+        target: Deno.env.get('doci_target'),
+        destinations: Deno.env.get('doci_destinations')?.split('\n') ?? [],
+        labels: Deno.env.get('doci_labels')?.split('\n') ?? [],
+        // or maybe .split(/\W+/)
+      };
+      console.error(`Pipeline inputs:`, params);
+
+      const configText = await Deno.readTextFile(flags.config);
+      const config = parseYaml(configText) as DociConfig;
+
+      const fullPath = path.resolve(config.entrypoint.specifier);
+      const knownDigest = localStorage.getItem(`specifier_${fullPath}`);
+      if (!knownDigest) throw die
+        `No digest found for ${fullPath}`;
+      console.error(`Using known digest`, knownDigest);
+
+      if (!params.target) throw die
+        `Please specify a target from config file ${flags.config}`;
+      const target: DociConfigTarget | undefined = config.targets?.[params.target ?? ''];
+      if (!target) throw die
+        `Target ${params.target} not found in config file ${flags.config}`;
+
+      const localStore = await OciStore.local('storage');
+      let originStore: OciStoreApi = localStore;
+      let originDigest = knownDigest;
+
+      // Perform an ejection if requested
+      if (target.baseRef) {
+        const {ejected, store} = await ejectArtifact({
+          baseRef: target.baseRef,
+          digest: knownDigest,
+
+          baseStore: await OciStore.local('base-storage'),
+          dociStore: localStore,
+          stagingStore: OciStore.inMemory(),
+        });
+
+        originStore = store;
+        originDigest = ejected.digest;
+      }
+
+      const githubOutput = Deno.env.get('GITHUB_OUTPUT');
+      if (githubOutput) {
+        const file = await Deno.open(githubOutput, {
+          write: true,
+          append: true,
+        });
+        const writer = file.writable.getWriter();
+        await writer.write(new TextEncoder().encode(`digest=${originDigest}`));
+        writer.close();
+        console.error(`Step output: digest=${originDigest}`);
+      }
+
+      for (const destination of params.destinations) {
+        const [ref, tag] = destination.split(':');
+        await pushFullArtifact(originStore, originDigest, ref, tag);
+      }
+    }});
+
 export const pipelineCommand = defineCommand({
   name: 'pipeline',
   description: `Automates components of a CI/CD pipeline using a YAML config file`,
@@ -189,5 +273,6 @@ export const pipelineCommand = defineCommand({
     buildCommand,
     exportCommand,
     pushCommand,
+    pushAllCommand,
   ],
 });

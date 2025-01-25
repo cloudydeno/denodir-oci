@@ -11,14 +11,11 @@ on:
 jobs:
 
   check:
+    name: Check w/ ${{ matrix.deno-version }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write
-      attestations: write
-      id-token: write
 
-    name: Check w/ ${{ matrix.deno-version }}
     strategy:
       matrix:
         deno-version:
@@ -76,16 +73,22 @@ jobs:
   # Push image to GitHub Packages.
   # See also https://docs.docker.com/docker-hub/builds/
   push:
-    needs: check
-    runs-on: ubuntu-latest
     name: 'Push container image'
-    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
 
     env:
       REGISTRY: ghcr.io
       IMAGE_NAME: cloudydeno/doci-cli
 
+    needs: check
     steps:
+      - uses: actions/checkout@v4
+
       - name: Use Deno stable
         uses: denoland/setup-deno@v2
         with:
@@ -99,7 +102,7 @@ jobs:
           key: deno-doci-https/v2-${{ github.sha }}
           restore-keys: deno-doci-https/v2-
       - name: Install denodir-oci utility
-        run: deno install --global --allow-read --allow-write=$HOME,${TMPDIR:-/tmp} --allow-run --allow-net --allow-env --reload=https://raw.githubusercontent.com https://raw.githubusercontent.com/cloudydeno/denodir-oci/main/doci/mod.ts
+        run: deno install --global --allow-read --allow-write=$HOME,${TMPDIR:-/tmp} --allow-run --allow-net --allow-env doci/mod.ts
 
       - name: Log in to the Container registry
         uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
@@ -108,28 +111,32 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: actions/checkout@v4
-
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-
-      - name: Show desired metadata
-        run: |
-          echo tags: ${{ steps.meta.outputs.tags }}
-          echo labels: ${{ steps.meta.outputs.labels }}
+          tags: |
+            type=sha
+            type=ref,event=pr
+            type=ref,event=tag
+            type=edge,branch=main
 
       - name: Build denodir
         id: build
-        run: echo "digest=$(doci pipeline build -o digest)\n" >> $GITHUB_OUTPUT
-      - name: Push alpine image
-        run: doci pipeline push --tag ${{ steps.name.outputs.tag }} --target alpine
+        run: doci pipeline build
+
+      - name: Push alpine tags
+        id: push
+        env:
+          doci_target: alpine
+          doci_destinations: ${{ steps.meta.outputs.tags }}
+          doci_labels: ${{ steps.meta.outputs.labels }}
+        run: doci pipeline push-all
 
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v2
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          subject-digest: ${{ steps.build.outputs.digest }}
-          push-to-registry: true
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: ${{ github.ref == 'refs/heads/main' }}
