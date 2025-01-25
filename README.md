@@ -1,8 +1,10 @@
 # denodir-oci
 Upload Deno cache directories to OCI registries. Download and run on another machine, or repackage with a Deno runtime layer to make a regular Docker image.
 
+Install the CLI globally like so:
+
 ```
-deno install -f --allow-{read,write}=$HOME,${TMPDIR:-/tmp} --allow-run --allow-net --allow-env --reload=https://raw.githubusercontent.com https://raw.githubusercontent.com/cloudydeno/denodir-oci/main/doci/mod.ts
+deno install -f --global --allow-read --allow-write=$HOME,${TMPDIR:-/tmp} --allow-run --allow-net --allow-env --reload=https://raw.githubusercontent.com https://raw.githubusercontent.com/cloudydeno/denodir-oci/main/doci/mod.ts
 ```
 
 ## Examples
