@@ -11,14 +11,11 @@ on:
 jobs:
 
   check:
+    name: Check w/ ${{ matrix.deno-version }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write
-      attestations: write
-      id-token: write
 
-    name: Check w/ ${{ matrix.deno-version }}
     strategy:
       matrix:
         deno-version:
@@ -76,15 +73,19 @@ jobs:
   # Push image to GitHub Packages.
   # See also https://docs.docker.com/docker-hub/builds/
   push:
-    needs: check
-    runs-on: ubuntu-latest
     name: 'Push container image'
-    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
 
     env:
       REGISTRY: ghcr.io
       IMAGE_NAME: cloudydeno/doci-cli
 
+    needs: check
     steps:
       - uses: actions/checkout@v4
 
