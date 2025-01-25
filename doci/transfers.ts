@@ -68,7 +68,7 @@ export async function pushFullImage(opts: {
 }) {
   for (const layer of [opts.manifest.config, ...opts.manifest.layers]) {
     if (await opts.client.hasBlob(layer.digest)) {
-      console.error('   ', 'Register already has', layer.digest);
+      console.error('   ', 'Registry already has', layer.digest);
     } else {
       console.error('   ', 'Uploading', layer.digest, '...');
       await opts.client.uploadBlob(layer, () => opts.sourceStore

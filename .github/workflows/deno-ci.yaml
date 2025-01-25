@@ -126,6 +126,14 @@ jobs:
         id: build
         run: echo "digest=$(doci pipeline build -o digest)\n" >> $GITHUB_OUTPUT
 
+      - name: hello
+        env:
+          subjectname: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subjectdigest: ${{ steps.build.outputs.digest }}
+        run: |
+          echo "$subjectname"
+          echo "$subjectdigest"
+
       - name: Push alpine tags
         env:
           doci_target: alpine
