@@ -121,14 +121,6 @@ jobs:
             type=ref,event=tag
             type=edge,branch=main
 
-      - name: Show desired metadata
-        env:
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-        run: |
-          echo $tags
-          echo $labels
-
       - name: Build denodir
         id: build
         run: echo "digest=$(doci pipeline build -o digest)\n" >> $GITHUB_OUTPUT

@@ -184,30 +184,24 @@ export const pushCommand = defineCommand({
 
   export const pushAllCommand = defineCommand({
     name: 'push-all',
-    description: `Pushes the same artifact to multiple places`,
+    description: `Pushes the same artifact from GHA to multiple places`,
     args: {
     },
     flags: {
       ...commonFlags,
-      target: {
-        short: 't',
-        typeFn: String,
-        description: `Use a named target from the project's configuration file`,
-      },
-      destinations: {
-        typeFn: String,
-        description: `A list of registry:tag pairs`,
-      },
-      labels: {
-        typeFn: String,
-        description: `A list of key=value pairs`,
-      },
     },
     async run(args, flags) {
+
+      const params = {
+        target: Deno.env.get('doci_target'),
+        destinations: Deno.env.get('doci_destinations')?.split('\n'),
+        labels: Deno.env.get('doci_labels')?.split('\n'),
+        // or maybe .split(/\W+/)
+      };
+      console.error(`Pipeline inputs:`, params);
+
       const configText = await Deno.readTextFile(flags.config);
       const config = parseYaml(configText) as DociConfig;
-
-      console.log(flags);
 
       const fullPath = path.resolve(config.entrypoint.specifier);
       const knownDigest = localStorage.getItem(`specifier_${fullPath}`);
@@ -215,11 +209,11 @@ export const pushCommand = defineCommand({
         `No digest found for ${fullPath}`;
       console.error(`Using known digest`, knownDigest);
 
-      if (!flags.target) throw die
+      if (!params.target) throw die
         `Please specify a target from config file ${flags.config}`;
-      const target: DociConfigTarget | undefined = config.targets?.[flags.target ?? ''];
+      const target: DociConfigTarget | undefined = config.targets?.[params.target ?? ''];
       if (!target) throw die
-        `Target ${flags.target} not found in config file ${flags.config}`;
+        `Target ${params.target} not found in config file ${flags.config}`;
 
       const localStore = await OciStore.local('storage');
       let originStore: OciStoreApi = localStore;
@@ -240,7 +234,7 @@ export const pushCommand = defineCommand({
         originDigest = ejected.digest;
       }
 
-      for (const destination of (flags.destinations ?? '').split(/\W+/)) {
+      for (const destination of params.destinations) {
         const [ref, tag] = destination.split(':');
         await pushFullArtifact(originStore, originDigest, ref, tag);
       }
