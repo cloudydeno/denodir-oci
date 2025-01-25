@@ -194,8 +194,8 @@ export const pushCommand = defineCommand({
 
       const params = {
         target: Deno.env.get('doci_target'),
-        destinations: Deno.env.get('doci_destinations')?.split('\n'),
-        labels: Deno.env.get('doci_labels')?.split('\n'),
+        destinations: Deno.env.get('doci_destinations')?.split('\n') ?? [],
+        labels: Deno.env.get('doci_labels')?.split('\n') ?? [],
         // or maybe .split(/\W+/)
       };
       console.error(`Pipeline inputs:`, params);
