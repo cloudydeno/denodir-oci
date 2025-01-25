@@ -81,6 +81,10 @@ jobs:
     name: 'Push container image'
     if: github.event_name == 'push'
 
+    env:
+      REGISTRY: ghcr.io
+      IMAGE_NAME: cloudydeno/doci-cli
+
     steps:
       - name: Use Deno stable
         uses: denoland/setup-deno@v2
@@ -97,29 +101,35 @@ jobs:
       - name: Install denodir-oci utility
         run: deno install --global --allow-read --allow-write=$HOME,${TMPDIR:-/tmp} --allow-run --allow-net --allow-env --reload=https://raw.githubusercontent.com https://raw.githubusercontent.com/cloudydeno/denodir-oci/main/doci/mod.ts
 
-      - name: Determine image name
-        id: name
-        run: |
-          IMAGE_ID=ghcr.io/cloudydeno/doci-cli
-          IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
-          if [[ "${{ github.ref }}" == "refs/tags/"* ]]
-          then VERSION=$( echo $VERSION | sed -e 's/^v//' )
-          else VERSION=$( echo ${{ github.sha }} | cut -c1-7 )
-          fi
-          echo "Will push to $IMAGE_ID:$VERSION"
-          echo "::set-output name=image::$IMAGE_ID"
-          echo "::set-output name=tag::$VERSION"
-
-      - name: Log into GitHub Container Registry
-        uses: docker/login-action@v3
+      - name: Log in to the Container registry
+        uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
         with:
-          registry: ghcr.io
-          username: x-access-token
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: actions/checkout@v4
 
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+
+      - name: Show desired metadata
+        run: |
+          echo tags: ${{ steps.meta.outputs.tags }}
+          echo labels: ${{ steps.meta.outputs.labels }}
+
       - name: Build denodir
-        run: doci pipeline build
+        id: build
+        run: echo "digest=$(doci pipeline build -o digest)\n" >> $GITHUB_OUTPUT
       - name: Push alpine image
         run: doci pipeline push --tag ${{ steps.name.outputs.tag }} --target alpine
+
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
