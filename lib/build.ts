@@ -253,7 +253,7 @@ export async function buildDenodirLayer(opts: {
 
       await tar.append(newLoc.virtualPath, {
         filePath: module.local,
-        mtime: 0,
+        // mtime: 0,
       });
 
       emitPathRemap = newLoc.genPath;

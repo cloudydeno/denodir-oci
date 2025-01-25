@@ -104,18 +104,24 @@ export async function runArtifact(opts: {
       }
     }
 
+    let entrypoint = configData.entrypoint;
+    if (entrypoint.startsWith('file:///denodir/')) {
+      entrypoint = entrypoint.replace('file://', tempDir);
+      console.error(entrypoint);
+    }
+
     const denoArgs = [
       'run',
       '--cached-only',
       ...configData.runtimeFlags,
       ...opts.runtimeFlags,
       '--',
-      configData.entrypoint,
+      entrypoint,
       ...opts.scriptFlags,
     ];
 
     console.error('+', 'deno', denoArgs
-      .map(x => /^[a-z0-9._-]+$/i.test(x) ? x : JSON.stringify(x))
+      .map(x => /^[-a-z0-9.,_=:\/]+$/i.test(x) ? x : JSON.stringify(x))
       .join(' '));
 
     // Wait for the child process to exit
@@ -125,6 +131,9 @@ export async function runArtifact(opts: {
         'DENO_DIR': path.join(tempDir, 'denodir'),
         ...(opts.environmentVariables ?? {}),
       },
+      stdin: 'inherit',
+      stdout: 'inherit',
+      stderr: 'inherit',
     }).output();
 
     exitCode = proc.code || 1;
