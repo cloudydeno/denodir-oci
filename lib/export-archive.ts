@@ -52,17 +52,20 @@ export async function exportArtifactAsArchive(opts: {
   if (manifestData.mediaType == MEDIATYPE_OCI_MANIFEST_INDEX_V1
     || manifestData.mediaType == MEDIATYPE_MANIFEST_LIST_V2) {
 
+    // TODO: something better, or at least reusable
     const selectedManifest = manifestData.manifests.find(archManifest => {
-      if (archManifest.platform?.os === 'unknown') return false;
-      if (archManifest.platform?.architecture == 'arm64' && Deno.build.arch == 'aarch64') {
+      const platform = archManifest.platform;
+      if (!platform) return false;
+      if (platform.os === 'unknown') return false;
+      if (platform.architecture == 'arm64' && Deno.build.arch == 'aarch64') {
         return true;
       }
-      if (archManifest.platform?.architecture == 'amd64' && Deno.build.arch == 'x86_64') {
+      if (platform.architecture == 'amd64' && Deno.build.arch == 'x86_64') {
         return true;
       }
     })
-
-    if (!selectedManifest) throw new Error(`TODO: No suitable manifest found in multimanifest artifact`);
+    if (!selectedManifest) throw new Error(
+      `TODO: No suitable manifest found in multimanifest artifact`);
 
     return await exportArtifactAsArchive({
       ...opts,
