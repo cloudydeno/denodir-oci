@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, test ]
     tags: [ v* ]
     paths-ignore:
       - '*.md'
@@ -86,6 +86,8 @@ jobs:
       IMAGE_NAME: cloudydeno/doci-cli
 
     steps:
+      - uses: actions/checkout@v4
+
       - name: Use Deno stable
         uses: denoland/setup-deno@v2
         with:
@@ -99,7 +101,7 @@ jobs:
           key: deno-doci-https/v2-${{ github.sha }}
           restore-keys: deno-doci-https/v2-
       - name: Install denodir-oci utility
-        run: deno install --global --allow-read --allow-write=$HOME,${TMPDIR:-/tmp} --allow-run --allow-net --allow-env --reload=https://raw.githubusercontent.com https://raw.githubusercontent.com/cloudydeno/denodir-oci/main/doci/mod.ts
+        run: deno install --global --allow-read --allow-write=$HOME,${TMPDIR:-/tmp} --allow-run --allow-net --allow-env doci/mod.ts
 
       - name: Log in to the Container registry
         uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
@@ -108,24 +110,28 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: actions/checkout@v4
-
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-
+          tags: |
+            type=sha
+            type=edge,branch=main
       - name: Show desired metadata
+        env:
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
         run: |
-          echo tags: ${{ steps.meta.outputs.tags }}
-          echo labels: ${{ steps.meta.outputs.labels }}
+          echo $tags
+          echo $labels
 
       - name: Build denodir
         id: build
         run: echo "digest=$(doci pipeline build -o digest)\n" >> $GITHUB_OUTPUT
+
       - name: Push alpine image
-        run: doci pipeline push --tag ${{ steps.name.outputs.tag }} --target alpine
+        run: doci pipeline push-all --target alpine --destinations "${{ steps.name.outputs.tags }}" --labels "${{ steps.name.outputs.labels }}"
 
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v2

@@ -7,6 +7,7 @@ import {
 import * as OciStore from "../../lib/store.ts";
 import { pushFullArtifact } from "../transfers.ts";
 import { buildSimpleImage, die, ejectArtifact, exportTarArchive } from "../actions.ts";
+import { OciStoreApi } from "../../lib/store/_api.ts";
 
 interface DociConfigLayer {
   specifier: string;
@@ -181,6 +182,70 @@ export const pushCommand = defineCommand({
     }
   }});
 
+  export const pushAllCommand = defineCommand({
+    name: 'push-all',
+    description: `Pushes the same artifact to multiple places`,
+    args: {
+    },
+    flags: {
+      ...commonFlags,
+      target: {
+        short: 't',
+        typeFn: String,
+        description: `Use a named target from the project's configuration file`,
+      },
+      destinations: {
+        typeFn: String,
+        description: `A list of registry:tag pairs`,
+      },
+      labels: {
+        typeFn: String,
+        description: `A list of key=value pairs`,
+      },
+    },
+    async run(args, flags) {
+      const configText = await Deno.readTextFile(flags.config);
+      const config = parseYaml(configText) as DociConfig;
+
+      console.log(flags);
+
+      const fullPath = path.resolve(config.entrypoint.specifier);
+      const knownDigest = localStorage.getItem(`specifier_${fullPath}`);
+      if (!knownDigest) throw die
+        `No digest found for ${fullPath}`;
+      console.error(`Using known digest`, knownDigest);
+
+      if (!flags.target) throw die
+        `Please specify a target from config file ${flags.config}`;
+      const target: DociConfigTarget | undefined = config.targets?.[flags.target ?? ''];
+      if (!target) throw die
+        `Target ${flags.target} not found in config file ${flags.config}`;
+
+      const localStorage = await OciStore.local('storage');
+      let originStorage: OciStoreApi = localStorage;
+      let originDigest = knownDigest;
+
+      // Perform an ejection if requested
+      if (target.baseRef) {
+        const {ejected, store} = await ejectArtifact({
+          baseRef: target.baseRef,
+          digest: knownDigest,
+
+          baseStore: await OciStore.local('base-storage'),
+          dociStore: localStorage,
+          stagingStore: OciStore.inMemory(),
+        });
+
+        originStorage = store;
+        originDigest = ejected.digest;
+      }
+
+      for (const destination of (flags.destinations ?? '').split(/\W+/)) {
+        const [ref, tag] = destination.split(':');
+        await pushFullArtifact(originStorage, originDigest, ref, tag);
+      }
+    }});
+
 export const pipelineCommand = defineCommand({
   name: 'pipeline',
   description: `Automates components of a CI/CD pipeline using a YAML config file`,
@@ -189,5 +254,6 @@ export const pipelineCommand = defineCommand({
     buildCommand,
     exportCommand,
     pushCommand,
+    pushAllCommand,
   ],
 });
