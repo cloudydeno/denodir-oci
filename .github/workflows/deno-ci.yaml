@@ -29,7 +29,7 @@ jobs:
 
     # "https" cache: code from the Internet
     - name: Cache https://
-      uses: actions/cache@v2
+      uses: actions/cache@v4
       with:
         path: ~/.cache/deno/deps/https
         key: deno-https/v2-${{ github.sha }}
