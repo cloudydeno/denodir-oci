@@ -15,7 +15,7 @@ export { parse as parseYaml } from "https://deno.land/std@0.177.0/encoding/yaml.
 // this was removed from /std and SubtleCrypto can't stream yet, so using an old /std
 export { Sha256 } from "https://deno.land/std@0.160.0/hash/sha256.ts";
 
-export type { ModuleGraphJson } from "https://deno.land/x/deno_graph@0.25.0/lib/types.d.ts";
+export type { ModuleGraphJson } from "https://deno.land/x/deno_graph@0.69.6/types.ts";
 
 export type {
   Manifest,

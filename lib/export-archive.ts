@@ -6,6 +6,11 @@ import {
   ManifestOCI,
   ManifestOCIIndex,
   ManifestV2,
+  ManifestV2List,
+  MEDIATYPE_MANIFEST_LIST_V2,
+  MEDIATYPE_MANIFEST_V2,
+  MEDIATYPE_OCI_MANIFEST_INDEX_V1,
+  MEDIATYPE_OCI_MANIFEST_V1,
   readableStreamFromReader,
   readerFromIterable,
   Tar,
@@ -38,10 +43,40 @@ export async function exportArtifactAsArchive(opts: {
 
   let configBytes: Uint8Array;
   let manifestBytes: Uint8Array;
-  let manifestData: ManifestV2 | ManifestOCI;
+  let manifestData: ManifestV2 | ManifestOCI | ManifestV2List | ManifestOCIIndex;
 
   manifestBytes = await opts.store.getFullLayer('manifest', opts.manifestDigest);
   manifestData = JSON.parse(new TextDecoder().decode(manifestBytes));
+
+  // When given a multi-arch manifest, pick one to use
+  if (manifestData.mediaType == MEDIATYPE_OCI_MANIFEST_INDEX_V1
+    || manifestData.mediaType == MEDIATYPE_MANIFEST_LIST_V2) {
+
+    // TODO: something better, or at least reusable
+    const selectedManifest = manifestData.manifests.find(archManifest => {
+      const platform = archManifest.platform;
+      if (!platform) return false;
+      if (platform.os === 'unknown') return false;
+      if (platform.architecture == 'arm64' && Deno.build.arch == 'aarch64') {
+        return true;
+      }
+      if (platform.architecture == 'amd64' && Deno.build.arch == 'x86_64') {
+        return true;
+      }
+    })
+    if (!selectedManifest) throw new Error(
+      `TODO: No suitable manifest found in multimanifest artifact`);
+
+    return await exportArtifactAsArchive({
+      ...opts,
+      manifestDigest: selectedManifest.digest,
+    });
+
+  } else if (manifestData.mediaType !== MEDIATYPE_MANIFEST_V2
+   && manifestData.mediaType !== MEDIATYPE_OCI_MANIFEST_V1) {
+    throw new Error(`Base manifest at ${opts.manifestDigest} has unsupported mediaType`);
+  }
+
   configBytes = await opts.store.getFullLayer('blob', manifestData.config.digest);
 
   const tar = new Tar();

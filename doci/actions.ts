@@ -30,6 +30,7 @@ export async function buildSimpleImage(opts: {
         baseSpecifier,
         includeBuildInfo: false,
         localFileRoot: opts.localFileRoot,
+        cacheFlags: opts.cacheFlags,
       });
       baseSpecifier = layer.mainSpecifier;
     }
@@ -39,6 +40,7 @@ export async function buildSimpleImage(opts: {
       baseSpecifier,
       includeBuildInfo: !opts.runtimeFlags?.includes('--no-check'),
       localFileRoot: opts.localFileRoot,
+      cacheFlags: opts.cacheFlags,
     });
 
     const finalDigest = await ctx.storeTo(opts.store, {
@@ -90,7 +92,7 @@ export async function runArtifact(opts: {
 
   const tempDir = await Deno.makeTempDir({prefix: 'denodir-run-'});
   // console.error({ tempDir });
-  let status: Deno.ProcessStatus | null = null;
+  let exitCode = 0;
   try {
 
     for (const layer of manifest.layers) {
@@ -102,36 +104,46 @@ export async function runArtifact(opts: {
       }
     }
 
-    const denoCmd = [
-      Deno.execPath(),
+    let entrypoint = configData.entrypoint;
+    if (entrypoint.startsWith('file:///denodir/')) {
+      entrypoint = entrypoint.replace('file://', tempDir);
+      console.error(entrypoint);
+    }
+
+    const denoArgs = [
       'run',
       '--cached-only',
       ...configData.runtimeFlags,
       ...opts.runtimeFlags,
       '--',
-      configData.entrypoint,
+      entrypoint,
       ...opts.scriptFlags,
     ];
-    console.error('+', denoCmd
-      .map(x => /^[a-z0-9._-]+$/i.test(x) ? x : JSON.stringify(x))
+
+    console.error('+', 'deno', denoArgs
+      .map(x => /^[-a-z0-9.,_=:\/]+$/i.test(x) ? x : JSON.stringify(x))
       .join(' '));
-    const proc = Deno.run({
-      cmd: denoCmd,
+
+    // Wait for the child process to exit
+    const proc = await new Deno.Command(Deno.execPath(), {
+      args: denoArgs,
       env: {
         'DENO_DIR': path.join(tempDir, 'denodir'),
         ...(opts.environmentVariables ?? {}),
       },
-    })
+      stdin: 'inherit',
+      stdout: 'inherit',
+      stderr: 'inherit',
+    }).output();
 
-    // Wait for the child process to exit
-    status = await proc.status();
+    exitCode = proc.code || 1;
 
   } finally {
     await Deno.remove(tempDir, {recursive: true});
   }
 
-  if (status?.success == false) {
-    Deno.exit(status.code);
+  if (exitCode) {
+    Deno.exit(exitCode);
   }
 }
 
