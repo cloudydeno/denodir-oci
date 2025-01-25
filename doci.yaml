@@ -1,0 +1,17 @@
+entrypoint:
+  specifier: doci/mod.ts
+
+dependencyLayers:
+- specifier: deps.ts
+
+runtimeFlags:
+- --allow-read
+- --allow-write
+- --allow-run
+- --allow-net
+- --allow-env
+
+targets:
+  alpine:
+    ref: ghcr.io/cloudydeno/doci-cli
+    baseRef: denoland/deno:alpine-$DenoVersion

@@ -3,6 +3,9 @@ name: CI
 on:
   push:
     branches: [ main ]
+    tags: [ v* ]
+    paths-ignore:
+      - '*.md'
   pull_request: {}
 
 jobs:
@@ -31,7 +34,9 @@ jobs:
     - name: Cache https://
       uses: actions/cache@v4
       with:
-        path: ~/.cache/deno/deps/https
+        path: |
+          ~/.cache/deno/remote/https
+          ~/.cache/deno/gen/https
         key: deno-https/v2-${{ github.sha }}
         restore-keys: deno-https/v2-
 
@@ -61,3 +66,54 @@ jobs:
         time ./doci/mod.ts pipeline build
         time ./doci/mod.ts pipeline export --target alpine | docker load
         time docker run --rm --read-only deno.dir/examples/welcome
+
+  # Push image to GitHub Packages.
+  # See also https://docs.docker.com/docker-hub/builds/
+  push:
+    needs: check
+    runs-on: ubuntu-latest
+    name: 'Push container image'
+    if: github.event_name == 'push'
+
+    steps:
+      - name: Use Deno stable
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.1
+      - name: Cache https://
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/deno/remote/https
+            ~/.cache/deno/gen/https
+          key: deno-doci-https/v2-${{ github.sha }}
+          restore-keys: deno-doci-https/v2-
+      - name: Install denodir-oci utility
+        run: deno install --global --allow-read --allow-write=$HOME,${TMPDIR:-/tmp} --allow-run --allow-net --allow-env --reload=https://raw.githubusercontent.com https://raw.githubusercontent.com/cloudydeno/denodir-oci/main/doci/mod.ts
+
+      - name: Determine image name
+        id: name
+        run: |
+          IMAGE_ID=ghcr.io/cloudydeno/doci-cli
+          IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
+          if [[ "${{ github.ref }}" == "refs/tags/"* ]]
+          then VERSION=$( echo $VERSION | sed -e 's/^v//' )
+          else VERSION=$( echo ${{ github.sha }} | cut -c1-7 )
+          fi
+          echo "Will push to $IMAGE_ID:$VERSION"
+          echo "::set-output name=image::$IMAGE_ID"
+          echo "::set-output name=tag::$VERSION"
+
+      - name: Log into GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: x-access-token
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/checkout@v4
+
+      - name: Build denodir
+        run: doci pipeline build
+      - name: Push alpine image
+        run: doci pipeline push --tag ${{ steps.name.outputs.tag }} --target alpine
