@@ -29,6 +29,7 @@ export class BuildContext {
     baseSpecifier?: string;
     includeBuildInfo?: boolean;
     localFileRoot?: string;
+    cacheFlags: string[];
   }) {
     const layer = await buildDenodirLayer({
       specifier,
@@ -36,6 +37,7 @@ export class BuildContext {
       baseLayer: this.layers.find(x => x.mainSpecifier == opts.baseSpecifier),
       includeBuildInfo: opts.includeBuildInfo,
       localFileRoot: opts.localFileRoot,
+      cacheFlags: opts.cacheFlags,
     });
     this.layers.push(layer);
     return layer;
@@ -76,9 +78,12 @@ export class BuildContext {
     const allowImports = runtimeFlags?.filter(x =>
       x.startsWith('--allow-import=')
       || x == '--allow-import');
+    const unstables = runtimeFlags?.filter(x =>
+      x.startsWith('--unstable-')
+      || x == '--unstable');
     const cacheFlags = [
-      ...runtimeFlags?.includes('--unstable') ? ['--unstable'] : [],
-      ...runtimeFlags?.includes('--no-check') ? ['--no-check'] : [],
+      ...unstables ?? [],
+      ...runtimeFlags?.includes('--no-check') ? ['--no-check'] : [], // TODO: deno 2 changed the default
       ...allowImports ?? [],
     ];
     console.error('+', 'deno', 'cache', ...cacheFlags, '--', specifier);
@@ -105,6 +110,7 @@ export interface DociLayer {
 
 export async function buildDenodirLayer(opts: {
   specifier: string;
+  cacheFlags: string[];
   dataPath: string;
   localFileRoot?: string;
   baseLayer?: DociLayer;
@@ -113,9 +119,13 @@ export async function buildDenodirLayer(opts: {
   if (opts.localFileRoot && !path.isAbsolute(opts.localFileRoot)) throw new Error(
     `When passed, localFileRoot needs to be an absolute path.`);
 
-  console.error('+', 'deno', 'info', '--json', '--', opts.specifier);
+  const allowImports = opts.cacheFlags.filter(x =>
+    x.startsWith('--allow-import=')
+    || x == '--allow-import');
+
+  console.error('+', 'deno', 'info', '--json', ...allowImports, '--', opts.specifier);
   const proc = await new Deno.Command('deno', {
-    args: ['info', '--json', '--', opts.specifier],
+    args: ['info', '--json', ...allowImports, '--', opts.specifier],
     stdin: 'null',
     stdout: 'piped',
     stderr: 'inherit',
@@ -164,7 +174,9 @@ export async function buildDenodirLayer(opts: {
   }
 
   for (const module of data.modules) {
-    if (!module.local) throw new Error(`Module ${module.specifier} not in local`);
+    if (module.error) throw `Deno reported a module error: ${module.error}`;
+    if (!module.local) throw new Error(
+      `Module ${module.specifier} not in local`);
   }
 
   const firstLocal = data.modules.find(x => x.local?.includes('/remote/'));

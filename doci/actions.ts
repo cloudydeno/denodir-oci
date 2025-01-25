@@ -30,6 +30,7 @@ export async function buildSimpleImage(opts: {
         baseSpecifier,
         includeBuildInfo: false,
         localFileRoot: opts.localFileRoot,
+        cacheFlags: opts.cacheFlags,
       });
       baseSpecifier = layer.mainSpecifier;
     }
@@ -39,6 +40,7 @@ export async function buildSimpleImage(opts: {
       baseSpecifier,
       includeBuildInfo: !opts.runtimeFlags?.includes('--no-check'),
       localFileRoot: opts.localFileRoot,
+      cacheFlags: opts.cacheFlags,
     });
 
     const finalDigest = await ctx.storeTo(opts.store, {

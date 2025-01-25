@@ -31,6 +31,7 @@ export const buildCommand = defineCommand({
   },
   async run(args, flags) {
 
+    // TODO: update flags for Deno 2
     const denoFlags = [
       ...(flags.unstable ? ['--unstable'] : []),
       ...(flags.skipCheck ? ['--no-check'] : []),

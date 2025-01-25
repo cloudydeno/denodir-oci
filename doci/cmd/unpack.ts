@@ -52,9 +52,11 @@ export const unpackCommand = defineCommand({
     const configRaw = await store.getFullLayer('blob', configDigest);
     const configData: DenodirArtifactConfig = JSON.parse(new TextDecoder().decode(configRaw));
 
-    const runtimeFlags = ['--cached-only'];
-    if (configData.runtimeFlags?.includes?.('--unstable')) runtimeFlags.push('--unstable');
-    if (configData.runtimeFlags?.includes?.('--no-check')) runtimeFlags.push('--no-check');
+    const unstables = configData.runtimeFlags?.filter(x =>
+      x.startsWith('--unstable-')
+      || x == '--unstable');
+    const runtimeFlags = ['--cached-only', ...unstables];
+    if (configData.runtimeFlags?.includes?.('--no-check')) runtimeFlags.push('--no-check'); // TODO: update for Deno 2
 
     const builtWithDeno = `${configData.builtWith?.deno ?? '0.0.0'}`.split('.');
     if (builtWithDeno.length !== 3) throw die
