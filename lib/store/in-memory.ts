@@ -15,8 +15,8 @@ export class OciStoreInmem implements OciStoreApi {
   putLayerFromFile(flavor: "blob" | "manifest", descriptor: ManifestOCIDescriptor, sourcePath: string): Promise<ManifestOCIDescriptor> {
     throw new Error("Method not implemented.");
   }
-  putLayerFromStream(flavor: "blob" | "manifest", descriptor: ManifestOCIDescriptor, stream: ReadableStream<Uint8Array>): Promise<ManifestOCIDescriptor> {
-    throw new Error("Method not implemented.");
+  async putLayerFromStream(flavor: "blob" | "manifest", descriptor: ManifestOCIDescriptor, stream: ReadableStream<Uint8Array>): Promise<ManifestOCIDescriptor> {
+    return await this.putLayerFromBytes(flavor, descriptor, new Uint8Array(await new Response(stream).arrayBuffer()));
   }
   describeManifest(reference: string): Promise<ManifestOCIDescriptor> {
     throw new Error("Method not implemented.");
