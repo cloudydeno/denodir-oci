@@ -6,6 +6,7 @@ import { exportArtifactAsArchive } from "../lib/export-archive.ts";
 import * as OciStore from "../lib/store.ts";
 import type { DenodirArtifactConfig } from "../lib/types.ts";
 import { extractTarArchive } from "../lib/util/extract.ts";
+import { renderImportmapFlag } from "../lib/util/importmap.ts";
 import { pullFullArtifact } from "./transfers.ts";
 
 export async function buildSimpleImage(opts: {
@@ -15,9 +16,14 @@ export async function buildSimpleImage(opts: {
   cacheFlags: string[];
   runtimeFlags: string[];
   localFileRoot: string;
+  imports?: Record<string,string>;
 }) {
   const ctx = new BuildContext();
   try {
+
+    if (opts.imports) {
+      ctx.addImportmap(opts.imports);
+    }
 
     // Cache and typecheck the module before we even consider emitting
     await ctx.cacheSpecifier(opts.mainSpecifier, opts.cacheFlags);
@@ -48,6 +54,7 @@ export async function buildSimpleImage(opts: {
       entrypoint: mainLayer.mainSpecifier,
       cacheFlags: opts.cacheFlags ?? [],
       runtimeFlags: opts.runtimeFlags ?? [],
+      importmap: opts.imports ? {imports: opts.imports} : undefined,
     });
 
     console.error('==>', `Stored manifest`, finalDigest);
@@ -110,11 +117,18 @@ export async function runArtifact(opts: {
       console.error(entrypoint);
     }
 
+    const runFlags = [
+      ...configData.runtimeFlags,
+      ...opts.runtimeFlags,
+    ];
+    if (configData.importmap) {
+      runFlags.push(renderImportmapFlag(configData.importmap.imports));
+    }
+
     const denoArgs = [
       'run',
       '--cached-only',
-      ...configData.runtimeFlags,
-      ...opts.runtimeFlags,
+      ...runFlags,
       '--',
       entrypoint,
       ...opts.scriptFlags,

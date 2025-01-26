@@ -13,6 +13,7 @@ import * as OciStore from "./store.ts";
 import { sha256stream } from "./util/digest.ts";
 import { stableJsonSerialize } from "./util/serialize.ts";
 import { ImageConfigWriter } from "./util/image-config.ts";
+import { renderImportmapFlag } from "./util/importmap.ts";
 
 /**
  * Combine a base docker image with a denodir artifact
@@ -79,10 +80,17 @@ export async function ejectToImage(opts: {
     });
   }
 
+  const runFlags = [
+    ...dociConfig.runtimeFlags,
+  ];
+  if (dociConfig.importmap) {
+    runFlags.push(renderImportmapFlag(dociConfig.importmap.imports));
+  }
+
   configWriter.setEntrypoint([
     `deno`, `run`,
     `--cached-only`,
-    ...dociConfig.runtimeFlags,
+    ...runFlags,
     dociConfig.entrypoint,
   ]);
   configWriter.setCommand([]);

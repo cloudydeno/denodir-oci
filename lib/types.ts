@@ -3,6 +3,9 @@ export interface DenodirArtifactConfig {
   entrypoint: string;
   cacheFlags?: Array<string>;
   runtimeFlags: Array<string>;
+  importmap?: {
+    imports: Record<string,string>;
+  };
 };
 
 export interface OciImageConfig {

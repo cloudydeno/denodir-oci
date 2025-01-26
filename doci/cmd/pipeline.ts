@@ -26,6 +26,9 @@ interface DociConfig {
     base: string;
   }>;
   targets?: Record<string, DociConfigTarget>;
+  importmap?: {
+    imports: Record<string,string>;
+  };
 }
 
 const commonFlags = {
@@ -58,6 +61,7 @@ export const buildCommand = defineCommand({
       depSpecifiers: config.dependencyLayers?.map(x => x.specifier) ?? [],
       mainSpecifier: config.entrypoint.specifier,
       localFileRoot: path.resolve(path.dirname(flags.config), config.localFileRoot ?? '.'),
+      imports: config.importmap?.imports,
     });
 
     if (flags.output == 'digest') {

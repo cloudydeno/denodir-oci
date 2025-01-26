@@ -25,19 +25,47 @@ export class BuildContext {
   manifest?: ManifestOCI;
   manifestBlob?: ManifestOCIDescriptor;
 
+  globalFlags = new Array<string>;
+  cacheFlags = new Array<string>;
+  infoFlags = new Array<string>;
+  runFlags = new Array<string>;
+
+  addImportmap(imports: Record<string,string>) {
+    const importmap = {
+      imports: Object.fromEntries(Object.entries(imports).map(([key, value]) => {
+        if (value.startsWith('./')) {
+          return [key, 'file://' + Deno.cwd() + value.slice(1)];
+        }
+        return [key, value];
+      })),
+    };
+    this.globalFlags.push(`--importmap=data:application/importmap+json;base64,${btoa(JSON.stringify(importmap))}`);
+  }
+
   async addLayer(specifier: string, opts: {
     baseSpecifier?: string;
     includeBuildInfo?: boolean;
     localFileRoot?: string;
     cacheFlags: string[];
   }) {
+
+    const flags = [
+      ...this.globalFlags,
+      ...this.infoFlags,
+      ...opts.cacheFlags.filter(x =>
+        x.startsWith('--allow-import=')
+        || x == '--allow-import'),
+      ...opts.cacheFlags.filter(x =>
+        x == '--unstable-sloppy-imports'),
+    ];
+
     const layer = await buildDenodirLayer({
       specifier,
       dataPath: path.join(this.tempDir, `layer-${this.layers.length+1}.tar.gz`),
       baseLayer: this.layers.find(x => x.mainSpecifier == opts.baseSpecifier),
       includeBuildInfo: opts.includeBuildInfo,
       localFileRoot: opts.localFileRoot,
-      cacheFlags: opts.cacheFlags,
+      denoFlags: flags,
     });
     this.layers.push(layer);
     return layer;
@@ -85,6 +113,8 @@ export class BuildContext {
       ...unstables ?? [],
       ...runtimeFlags?.includes('--no-check') ? ['--no-check'] : [], // TODO: deno 2 changed the default
       ...allowImports ?? [],
+      ...this.globalFlags,
+      ...this.cacheFlags,
     ];
     console.error('+', 'deno', 'cache', ...cacheFlags, '--', specifier);
     const proc = await new Deno.Command('deno', {
@@ -110,7 +140,7 @@ export interface DociLayer {
 
 export async function buildDenodirLayer(opts: {
   specifier: string;
-  cacheFlags: string[];
+  denoFlags: string[];
   dataPath: string;
   localFileRoot?: string;
   baseLayer?: DociLayer;
@@ -119,13 +149,9 @@ export async function buildDenodirLayer(opts: {
   if (opts.localFileRoot && !path.isAbsolute(opts.localFileRoot)) throw new Error(
     `When passed, localFileRoot needs to be an absolute path.`);
 
-  const allowImports = opts.cacheFlags.filter(x =>
-    x.startsWith('--allow-import=')
-    || x == '--allow-import');
-
-  console.error('+', 'deno', 'info', '--json', ...allowImports, '--', opts.specifier);
+  console.error('+', 'deno', 'info', '--json', ...opts.denoFlags, '--', opts.specifier);
   const proc = await new Deno.Command('deno', {
-    args: ['info', '--json', ...allowImports, '--', opts.specifier],
+    args: ['info', '--json', ...opts.denoFlags, '--', opts.specifier],
     stdin: 'null',
     stdout: 'piped',
     stderr: 'inherit',
