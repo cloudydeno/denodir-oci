@@ -23,7 +23,7 @@ export type {
   ManifestV2, ManifestV2Descriptor, ManifestV2List,
   RegistryRepo,
   RegistryClientOpts,
-} from "https://deno.land/x/docker_registry_client@v0.4.1/index.ts";
+} from "https://deno.land/x/docker_registry_client@v0.5.0/index.ts";
 export {
   RegistryClientV2,
   RegistryHttpError,
@@ -32,7 +32,7 @@ export {
   MEDIATYPE_OCI_MANIFEST_INDEX_V1,
   MEDIATYPE_MANIFEST_V2,
   MEDIATYPE_MANIFEST_LIST_V2,
-} from "https://deno.land/x/docker_registry_client@v0.4.1/index.ts";
+} from "https://deno.land/x/docker_registry_client@v0.5.0/index.ts";
 
 export { komando, defineCommand } from "https://deno.land/x/komando@v1.0.2/mod.js";
 export type { Flags, Args } from "https://deno.land/x/komando@v1.0.2/mod.js";

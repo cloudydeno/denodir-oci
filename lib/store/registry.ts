@@ -128,7 +128,7 @@ function nullIf404(err: unknown) {
 }
 
 
-export async function getOciRegistry(repo: RegistryRepo, scopes: ['pull', 'push'] | ['pull']) {
+export async function getOciRegistry(repo: RegistryRepo, scopes: Array<'pull' | 'push'>) {
   const config: RegistryClientOpts = {
     repo, scopes,
     acceptOCIManifests: true,
@@ -139,6 +139,12 @@ export async function getOciRegistry(repo: RegistryRepo, scopes: ['pull', 'push'
   if (credential) {
     config.username = credential.Username;
     config.password = credential.Secret;
+  }
+
+  // Workaround for https://github.com/denoland/deno/issues/27830
+  // Trigger is response headers size when initializing blob uploads
+  if (repo.index.name.endsWith('.pkg.dev') && scopes.includes('push')) {
+    config.client = Deno.createHttpClient({ http2: false });
   }
 
   console.error('-->', 'Creating OCI client for', repo.index.name,
