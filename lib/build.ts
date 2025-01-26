@@ -201,7 +201,7 @@ export async function buildDenodirLayer(opts: {
 
   for (const module of data.modules) {
     if (module.error) throw `Deno reported a module error: ${module.error}`;
-    if (!module.local) throw new Error(
+    if (!module.local && !module.specifier.startsWith('node:')) throw new Error(
       `Module ${module.specifier} not in local`);
   }
 
@@ -233,6 +233,8 @@ export async function buildDenodirLayer(opts: {
 
   for (const module of data.modules.sort((a,b) => a.specifier.localeCompare(b.specifier))) {
     if (module.error) throw new Error(`${module.specifier}: ${module.error}`);
+    if (module.specifier.startsWith('node:')) continue;
+
     if (layer.storedSpecifiers.has(module.specifier)) continue;
     layer.storedSpecifiers.add(module.specifier);
     // console.log(module.specifier, module.local, module.emit);
