@@ -6,6 +6,7 @@ import {
   RegistryRepo,
 } from "../../deps.ts";
 import { fetchDockerCredential } from "../docker-config.ts";
+import { sha256bytesToHex } from "../util/digest.ts";
 import { OciStoreApi } from "./_api.ts";
 
 /** Simple API around an OCI / Docker registry. */
@@ -44,8 +45,20 @@ export class OciRegistry implements OciStoreApi {
   putLayerFromStream(flavor: "blob"|"manifest",descriptor: ManifestOCIDescriptor,stream: ReadableStream<Uint8Array>): Promise<ManifestOCIDescriptor> {
     throw new Error("Method not implemented.");
   }
-  putLayerFromBytes(flavor: "blob"|"manifest",descriptor: Omit<ManifestOCIDescriptor,"digest"|"size">&{ digest?: string|undefined; },rawData: Uint8Array): Promise<ManifestOCIDescriptor> {
-    throw new Error("Method not implemented.");
+  async putLayerFromBytes(flavor: "blob"|"manifest",descriptor: Omit<ManifestOCIDescriptor,"digest"|"size">&{ digest?: string|undefined; },rawData: Uint8Array): Promise<ManifestOCIDescriptor> {
+    if (flavor == 'blob') {
+      const digest = descriptor.digest ?? `sha256:${await sha256bytesToHex(rawData)}`;
+      const fullDescriptor: ManifestOCIDescriptor = {
+        ...descriptor,
+        digest,
+        size: rawData.byteLength,
+      };
+      await this.uploadBlob(fullDescriptor, () => Promise.resolve(ReadableStream.from([rawData])));
+      return fullDescriptor;
+    } else if (flavor == 'manifest') {
+      // TODO
+    }
+    throw new Error(`TODO: putLayerFromBytes for flavor "${flavor}" is not implemented.`);
   }
   async statLayer(flavor: "blob"|"manifest", ref: string): Promise<{ size: number; digest: string }|null> {
     if (flavor == 'blob') {
