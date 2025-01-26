@@ -11,6 +11,7 @@ import {
   RegistryRepo,
   Manifest,
   ManifestOCIDescriptor,
+  ManifestV2,
 } from "../deps.ts";
 import * as OciStore from "../lib/store.ts";
 import { OciRegistry } from "../lib/store/registry.ts";
@@ -164,12 +165,14 @@ class ArtifactPuller {
   async pullImage(descriptor: ManifestOCIDescriptor) {
     const manifest = await this.readManifest(descriptor.digest);
 
-    if (manifest.json.mediaType != MEDIATYPE_OCI_MANIFEST_V1
-        && manifest.json.mediaType != MEDIATYPE_MANIFEST_V2) {
-      throw new Error(`Received manifest of unsupported type "${manifest.json.mediaType}. Is this actually a normal container image?`);
+    const manifestMediaType = manifest.json.mediaType ?? descriptor.mediaType;
+    if (manifestMediaType != MEDIATYPE_OCI_MANIFEST_V1
+        && manifestMediaType != MEDIATYPE_MANIFEST_V2) {
+      throw new Error(`Received manifest of unsupported type "${manifestMediaType}". Is this actually a normal container image?`);
     }
+    const manifestJson = manifest.json as ManifestV2 | ManifestOCI;
 
-    for (const layer of [manifest.json.config, ...manifest.json.layers]) {
+    for (const layer of [manifestJson.config, ...manifestJson.layers]) {
       const layerStat = await this.targetStore.statLayer('blob', layer.digest);
       if (layerStat) {
         if (layerStat.size !== layer.size) {
@@ -187,7 +190,7 @@ class ArtifactPuller {
     }
 
     const result = await this.targetStore.putLayerFromBytes('manifest', {
-      mediaType: manifest.json.mediaType,
+      mediaType: manifestMediaType,
       digest: descriptor.digest,
       annotations: {
         ...descriptor.annotations,
