@@ -16,15 +16,15 @@ import {
 import * as OciStore from "../lib/store.ts";
 import { OciRegistry } from "../lib/store/registry.ts";
 
-export async function pushFullArtifact(sourceStore: OciStore.Api, manifestDigest: string, destination: string, forceTag?: string) {
+export async function pushFullArtifact(sourceStore: OciStore.Api, manifestDigest: string, destinationRef: string, forceTag?: string) {
   const manifestRaw = await sourceStore.getFullLayer('manifest', manifestDigest);
   const manifest: ManifestOCI | ManifestOCIIndex = JSON.parse(new TextDecoder().decode(manifestRaw));
 
-  var rar = parseRepoAndRef(destination);
-  const ref = forceTag ?? rar.tag ?? rar.digest;
+  const destination = parseRepoAndRef(destinationRef);
+  const ref = forceTag ?? destination.tag ?? destination.digest;
   if (!ref) throw 'No desired tag or digest found';
 
-  const client = await OciStore.registry(rar, ['pull', 'push']);
+  const client = await OciStore.registry(destination, ['pull', 'push']);
 
   if (manifest.mediaType == 'application/vnd.oci.image.manifest.v1+json') {
     const resp = await pushFullImage({
@@ -34,6 +34,9 @@ export async function pushFullArtifact(sourceStore: OciStore.Api, manifestDigest
       sourceStore,
       client,
     });
+    if (resp.digest !== manifestDigest) {
+      throw new Error(`Assert failed: ${resp.digest} != ${manifestDigest}`);
+    }
     console.error('==>', 'Image upload complete!', resp.digest);
 
   } else if (manifest.mediaType == 'application/vnd.oci.image.index.v1+json') {
@@ -41,7 +44,7 @@ export async function pushFullArtifact(sourceStore: OciStore.Api, manifestDigest
       const innerManifestRaw = await sourceStore.getFullLayer('manifest', item.digest);
       const innerManifest: ManifestOCI = JSON.parse(new TextDecoder().decode(innerManifestRaw));
 
-      const resp = await pushFullImage({
+      await pushFullImage({
         manifest: innerManifest,
         manifestRaw: innerManifestRaw,
         ref: item.digest,
@@ -55,9 +58,23 @@ export async function pushFullArtifact(sourceStore: OciStore.Api, manifestDigest
       mediaType: manifest.mediaType,
       ref: ref,
     });
+    if (resp.digest !== manifestDigest) {
+      throw new Error(`Assert failed: ${resp.digest} != ${manifestDigest}`);
+    }
     console.error('==>', 'Index upload complete!', resp.digest);
 
   } else throw new Error(`Unhandled manifest mediaType ${JSON.stringify(manifest.mediaType)}`);
+
+  const descriptor: ManifestOCIDescriptor = {
+    digest: manifestDigest,
+    mediaType: manifest.mediaType,
+    size: manifestRaw.byteLength,
+  };
+
+  return {
+    destination,
+    descriptor,
+  }
 }
 
 export async function pushFullImage(opts: {

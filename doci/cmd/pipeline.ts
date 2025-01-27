@@ -264,8 +264,7 @@ export const pushCommand = defineCommand({
       }
 
       for (const destination of params.destinations) {
-        const [ref, tag] = destination.split(':');
-        await pushFullArtifact(originStore, originDigest, ref, tag);
+        await pushFullArtifact(originStore, originDigest, destination);
       }
     }});
 
