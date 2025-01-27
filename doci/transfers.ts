@@ -20,8 +20,12 @@ export async function pushFullArtifact(sourceStore: OciStore.Api, manifestDigest
   const manifestRaw = await sourceStore.getFullLayer('manifest', manifestDigest);
   const manifest: ManifestOCI | ManifestOCIIndex = JSON.parse(new TextDecoder().decode(manifestRaw));
 
-  const destination = parseRepoAndRef(destinationRef);
-  const ref = forceTag ?? destination.tag ?? destination.digest;
+  let destination = parseRepoAndRef(destinationRef);
+  if (forceTag) {
+    destination = parseRepoAndRef(`${destination.canonicalName}:${forceTag}`);
+  }
+
+  const ref = destination.tag ?? destination.digest;
   if (!ref) throw 'No desired tag or digest found';
 
   const client = await OciStore.registry(destination, ['pull', 'push']);
