@@ -10,7 +10,7 @@ export { parse as parseYaml } from "https://deno.land/std@0.177.0/encoding/yaml.
 
 export type { ModuleGraphJson } from "https://deno.land/x/deno_graph@0.69.6/types.ts";
 
-export * as oci from "https://deno.land/x/oci_toolkit@v0.1.1/mod.ts";
+export * as oci from "https://deno.land/x/oci_toolkit@v0.1.2/mod.ts";
 
 export type {
   Manifest,
