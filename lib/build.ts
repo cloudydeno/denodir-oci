@@ -208,9 +208,9 @@ export async function buildDenodirLayer(opts: {
 
   const tar = new Tar();
 
-  // Need to explicitly capture redirections
-  for (const [fromUrl, toUrl] of Object.entries(data.redirects)) {
-    const url = new URL(fromUrl);
+  const addedPaths = new Set<string>;
+  async function addFromUrl(rawUrl: string) {
+    const url = new URL(rawUrl);
     const hashString = url.pathname + url.search;
     // TODO: nonstandard port is _PORT or something
     const cachePath = path.join(prefix, 'remote',
@@ -219,12 +219,28 @@ export async function buildDenodirLayer(opts: {
       await oci.sha256string(hashString));
     // console.log('redirect', fromUrl, 'to', cachePath)
 
+    if (addedPaths.has(cachePath)) return;
+    addedPaths.add(cachePath);
+
     await tar.append('denodir/'+cachePath.slice(prefixLength), {
       filePath: cachePath,
       // ...await cleanDepsMeta(cachePath),
       // mtime: 0,
     });
+  }
 
+  // Need to explicitly capture redirections
+  for (const [fromUrl, toUrl] of Object.entries(data.redirects)) {
+    if (fromUrl.startsWith('jsr:')) {
+      // JSR redirections go from the virtual protocol to https URLs
+      // We need to cache the https URLs for the JSR metadata as well
+      const [host, scope, name, version] = toUrl.split('/').slice(2);
+      // https://jsr.io/docs/api
+      await addFromUrl(`https://${host}/${scope}/${name}/meta.json`);
+      await addFromUrl(`https://${host}/${scope}/${name}/${version}_meta.json`);
+    } else {
+      await addFromUrl(fromUrl);
+    }
   }
 
   for (const module of data.modules.sort((a,b) => a.specifier.localeCompare(b.specifier))) {
