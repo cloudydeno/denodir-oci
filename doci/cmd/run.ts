@@ -1,5 +1,4 @@
-import { defineCommand } from "../../deps.ts";
-import * as OciStore from "../../lib/store.ts";
+import { defineCommand, oci } from "../../deps.ts";
 import { die, runArtifact } from "../actions.ts";
 
 export const runCommand = defineCommand({
@@ -26,7 +25,7 @@ export const runCommand = defineCommand({
     const runtimeFlags = argsAll.slice(0, argsAll.indexOf('--'));
 
     await runArtifact({
-      store: await OciStore.local(),
+      store: await oci.newLocalStore(),
       digest: flags.digest,
       runtimeFlags,
       scriptFlags,

@@ -1,6 +1,4 @@
-import { defineCommand } from "../../deps.ts";
-import * as OciStore from "../../lib/store.ts";
-import { pullFullArtifact } from "../transfers.ts";
+import { defineCommand, oci } from "../../deps.ts";
 
 export const pullCommand = defineCommand({
   name: 'pull',
@@ -14,5 +12,5 @@ export const pullCommand = defineCommand({
   flags: {
   },
   async run(args, flags) {
-    await pullFullArtifact(await OciStore.local(), args.remote);
+    await oci.pullFullArtifact(await oci.newLocalStore(), args.remote);
   }});

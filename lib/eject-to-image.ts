@@ -6,13 +6,10 @@ import {
   MEDIATYPE_MANIFEST_V2,
   MEDIATYPE_OCI_MANIFEST_INDEX_V1,
   MEDIATYPE_OCI_MANIFEST_V1,
+  oci,
 } from "../deps.ts";
 
-import type { DenodirArtifactConfig, OciImageConfig } from "./types.ts";
-import * as OciStore from "./store.ts";
-import { sha256stream } from "./util/digest.ts";
-import { stableJsonSerialize } from "./util/serialize.ts";
-import { ImageConfigWriter } from "./util/image-config.ts";
+import type { DenodirArtifactConfig } from "./types.ts";
 import { renderImportmapFlag } from "./util/importmap.ts";
 
 /**
@@ -21,7 +18,7 @@ import { renderImportmapFlag } from "./util/importmap.ts";
  * Tested with: Docker, podman, containerd
  */
 export async function ejectToImage(opts: {
-  store: OciStore.Api;
+  store: oci.OciStoreApi;
   baseDigest: string;
   dociDigest: string;
   annotations?: Record<string, string>;
@@ -48,7 +45,7 @@ export async function ejectToImage(opts: {
 
     return await opts.store.putLayerFromBytes('manifest', {
       mediaType: MEDIATYPE_OCI_MANIFEST_INDEX_V1,
-    }, stableJsonSerialize(newList));
+    }, oci.stableJsonSerialize(newList));
 
   } else if (baseManifest.mediaType !== MEDIATYPE_MANIFEST_V2
    && baseManifest.mediaType !== MEDIATYPE_OCI_MANIFEST_V1) {
@@ -57,10 +54,10 @@ export async function ejectToImage(opts: {
 
   const dociManifest: ManifestOCI = JSON.parse(new TextDecoder().decode(await opts.store.getFullLayer('manifest', opts.dociDigest)));
 
-  const baseConfig: OciImageConfig = JSON.parse(new TextDecoder().decode(await opts.store.getFullLayer('blob', baseManifest.config.digest)));
+  const baseConfig: oci.OciImageConfig = JSON.parse(new TextDecoder().decode(await opts.store.getFullLayer('blob', baseManifest.config.digest)));
   const dociConfig: DenodirArtifactConfig = JSON.parse(new TextDecoder().decode(await opts.store.getFullLayer('blob', dociManifest.config.digest)));
 
-  const configWriter = new ImageConfigWriter(baseConfig, `cloudydeno.denodir-oci.v0`);
+  const configWriter = new oci.ImageConfigWriter(baseConfig, `cloudydeno.denodir-oci.v0`);
 
   const knownDenodir = configWriter.getEnv('DENO_DIR');
   if (knownDenodir !== '/denodir') {
@@ -97,11 +94,11 @@ export async function ejectToImage(opts: {
 
   const configDesc = await opts.store.putLayerFromBytes('blob', {
     mediaType: "application/vnd.oci.image.config.v1+json",
-  }, stableJsonSerialize(configWriter.data));
+  }, oci.stableJsonSerialize(configWriter.data));
 
   const manifestDesc = await opts.store.putLayerFromBytes('manifest', {
     mediaType: MEDIATYPE_OCI_MANIFEST_V1,
-  }, stableJsonSerialize<ManifestOCI>({
+  }, oci.stableJsonSerialize<ManifestOCI>({
     schemaVersion: 2,
     mediaType: MEDIATYPE_OCI_MANIFEST_V1,
     config: configDesc,
@@ -121,8 +118,8 @@ export async function ejectToImage(opts: {
   return manifestDesc;
 }
 
-async function getUncompressedDigest(store: OciStore.Api, blobDigest: string) {
+async function getUncompressedDigest(store: oci.OciStoreApi, blobDigest: string) {
   const blobReader = await store.getLayerStream('blob', blobDigest);
   const decompressed = blobReader.pipeThrough(new DecompressionStream("gzip"));
-  return `sha256:${await sha256stream(decompressed)}`;
+  return `sha256:${await oci.sha256stream(decompressed)}`;
 }

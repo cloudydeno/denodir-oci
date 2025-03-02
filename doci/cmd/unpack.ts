@@ -1,7 +1,6 @@
 // explode the raw contents of a built artifact into (a temp directory?) for inspection/debugging
 
-import { defineCommand, ManifestOCI, path } from "../../deps.ts";
-import * as OciStore from "../../lib/store.ts";
+import { defineCommand, ManifestOCI, path, oci } from "../../deps.ts";
 import type { DenodirArtifactConfig } from "../../lib/types.ts";
 import { die, extractLayer } from "../actions.ts";
 
@@ -38,7 +37,7 @@ export const unpackCommand = defineCommand({
         `The destination folder ${flags.destination} could not be read: ${err.message}`;
     }
 
-    const store = await OciStore.local();
+    const store = await oci.newLocalStore();
 
     const manifestRaw = await store.getFullLayer('manifest', flags.digest);
     const manifest: ManifestOCI = JSON.parse(new TextDecoder().decode(manifestRaw));

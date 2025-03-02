@@ -2,12 +2,10 @@ import {
   defineCommand,
   parseYaml,
   path,
+  oci,
 } from "../../deps.ts";
 
-import * as OciStore from "../../lib/store.ts";
-import { pushFullArtifact } from "../transfers.ts";
 import { buildSimpleImage, die, ejectArtifact, exportTarArchive } from "../actions.ts";
-import { OciStoreApi } from "../../lib/store/_api.ts";
 
 interface DociConfigLayer {
   specifier: string;
@@ -55,7 +53,7 @@ export const buildCommand = defineCommand({
     const config = parseYaml(configText) as DociConfig;
 
     const finalDigest = await buildSimpleImage({
-      store: await OciStore.local(),
+      store: await oci.newLocalStore(),
       cacheFlags: config.cacheFlags ?? [],
       runtimeFlags: config.runtimeFlags ?? [],
       depSpecifiers: config.dependencyLayers?.map(x => x.specifier) ?? [],
@@ -136,9 +134,9 @@ export const exportCommand = defineCommand({
       format: flags.format,
       targetRef: target.ref,
 
-      baseStore: await OciStore.local('base-storage'),
-      dociStore: await OciStore.local(),
-      stagingStore: OciStore.inMemory(),
+      baseStore: await oci.newLocalStore('base-storage'),
+      dociStore: await oci.newLocalStore(),
+      stagingStore: oci.newInMemoryStore(),
       targetStream: flags.output == '-'
         ? Deno.stdout.writable
         : await Deno.open(flags.output, {
@@ -183,19 +181,19 @@ export const pushCommand = defineCommand({
       `Target ${flags.target} not found in config file ${flags.config}`;
 
     if (!target.baseRef) {
-      await pushFullArtifact(await OciStore.local(), knownDigest, target.ref, flags.tag);
+      await oci.pushFullArtifact(await oci.newLocalStore(), knownDigest, target.ref, flags.tag);
 
     } else {
       const {ejected, store} = await ejectArtifact({
         baseRef: target.baseRef,
         digest: knownDigest,
 
-        baseStore: await OciStore.local('base-storage'),
-        dociStore: await OciStore.local(),
-        stagingStore: OciStore.inMemory(),
+        baseStore: await oci.newLocalStore('base-storage'),
+        dociStore: await oci.newLocalStore(),
+        stagingStore: oci.newInMemoryStore(),
       });
 
-      await pushFullArtifact(store, ejected.digest, target.ref, flags.tag);
+      await oci.pushFullArtifact(store, ejected.digest, target.ref, flags.tag);
     }
   }});
 
@@ -232,8 +230,8 @@ export const pushCommand = defineCommand({
       if (!target) throw die
         `Target ${params.target} not found in config file ${flags.config}`;
 
-      const localStore = await OciStore.local('storage');
-      let originStore: OciStoreApi = localStore;
+      const localStore = await oci.newLocalStore('storage');
+      let originStore: oci.OciStoreApi = localStore;
       let originDigest = knownDigest;
 
       // Perform an ejection if requested
@@ -242,9 +240,9 @@ export const pushCommand = defineCommand({
           baseRef: target.baseRef,
           digest: knownDigest,
 
-          baseStore: await OciStore.local('base-storage'),
+          baseStore: await oci.newLocalStore('base-storage'),
           dociStore: localStore,
-          stagingStore: OciStore.inMemory(),
+          stagingStore: oci.newInMemoryStore(),
         });
 
         originStore = store;
@@ -264,7 +262,7 @@ export const pushCommand = defineCommand({
       }
 
       for (const destination of params.destinations) {
-        await pushFullArtifact(originStore, originDigest, destination);
+        await oci.pushFullArtifact(originStore, originDigest, destination);
       }
     }});
 

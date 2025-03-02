@@ -1,5 +1,4 @@
-import { defineCommand } from "../../deps.ts";
-import * as OciStore from "../../lib/store.ts";
+import { defineCommand, oci } from "../../deps.ts";
 import { die, exportTarArchive } from "../actions.ts";
 
 export const exportCommand = defineCommand({
@@ -40,9 +39,9 @@ export const exportCommand = defineCommand({
       format: flags.format,
       targetRef: flags.tag,
 
-      baseStore: await OciStore.local('base-storage'),
-      dociStore: await OciStore.local(),
-      stagingStore: OciStore.inMemory(),
+      baseStore: await oci.newLocalStore('base-storage'),
+      dociStore: await oci.newLocalStore(),
+      stagingStore: oci.newInMemoryStore(),
       targetStream: Deno.stdout.writable,
     });
   }});

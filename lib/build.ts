@@ -4,16 +4,12 @@ import {
   ModuleGraphJson,
   assertEquals,
   Tar,
-  assert,
   Buffer,
   path,
   readableStreamFromReader,
+  oci,
 } from "../deps.ts";
-import { OciStoreApi } from "./store/_api.ts";
 import type { DenodirArtifactConfig } from "./types.ts";
-import { sha256stream, sha256string } from "./util/digest.ts";
-import { gzipStream } from "./util/gzip.ts";
-import { stableJsonSerialize } from "./util/serialize.ts";
 
 export class BuildContext {
   tempDir = Deno.makeTempDirSync({prefix: 'denodir-oci-build-'});
@@ -71,7 +67,7 @@ export class BuildContext {
     return layer;
   }
 
-  async storeTo(store: OciStoreApi, config: DenodirArtifactConfig) {
+  async storeTo(store: oci.OciStoreApi, config: DenodirArtifactConfig) {
     if (this.layers.length < 1) throw new Error(
       `Need at least one layer to make a manifest`);
     if (this.layers.some(x => !x.descriptor?.digest)) throw new Error(
@@ -86,7 +82,7 @@ export class BuildContext {
     this.config = config;
     this.configBlob = await store.putLayerFromBytes('blob', {
       mediaType: "application/vnd.deno.denodir.config.v1+json",
-    }, stableJsonSerialize(this.config));
+    }, oci.stableJsonSerialize(this.config));
 
     this.manifest = {
       schemaVersion: 2,
@@ -96,7 +92,7 @@ export class BuildContext {
     };
     this.manifestBlob = await store.putLayerFromBytes('manifest', {
       mediaType: this.manifest.mediaType!,
-    }, stableJsonSerialize(this.manifest));
+    }, oci.stableJsonSerialize(this.manifest));
 
     return this.manifestBlob.digest;
   }
@@ -220,7 +216,7 @@ export async function buildDenodirLayer(opts: {
     const cachePath = path.join(prefix, 'remote',
       url.protocol.replace(/:$/, ''),
       url.hostname,
-      await sha256string(hashString));
+      await oci.sha256string(hashString));
     // console.log('redirect', fromUrl, 'to', cachePath)
 
     await tar.append('denodir/'+cachePath.slice(prefixLength), {
@@ -369,7 +365,7 @@ function cleanDepsMetaInner(metadata: string) {
 
   delete meta.time;
 
-  return stableJsonSerialize(meta);
+  return oci.stableJsonSerialize(meta);
 }
 
 
@@ -388,11 +384,11 @@ function cleanDepsMetaInner(metadata: string) {
   targetStream: WritableStream<Uint8Array>,
 ) {
   const [rawLeft, rawRight] = sourceData.tee();
-  const uncompressedHashPromise = sha256stream(rawLeft);
-  const [compressedData, compressionStatsPromise] = gzipStream(rawRight);
+  const uncompressedHashPromise = oci.sha256stream(rawLeft);
+  const [compressedData, compressionStatsPromise] = oci.gzipStream(rawRight);
 
   const [gzipLeft, gzipRight] = compressedData.tee();
-  const compressedHashPromise = sha256stream(gzipLeft);
+  const compressedHashPromise = oci.sha256stream(gzipLeft);
   const storagePromise = gzipRight.pipeTo(targetStream);
 
   const [

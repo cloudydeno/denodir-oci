@@ -1,6 +1,4 @@
-import { defineCommand } from "../../deps.ts";
-import * as OciStore from "../../lib/store.ts";
-import { pushFullArtifact } from "../transfers.ts";
+import { defineCommand, oci } from "../../deps.ts";
 import { buildSimpleImage } from "../actions.ts";
 
 export const buildCommand = defineCommand({
@@ -37,7 +35,7 @@ export const buildCommand = defineCommand({
       ...(flags.skipCheck ? ['--no-check'] : []),
     ];
 
-    const store = await OciStore.local();
+    const store = await oci.newLocalStore();
     const mainSpecifier = args.specifiers.pop()!;
 
     const digest = await buildSimpleImage({
@@ -51,7 +49,7 @@ export const buildCommand = defineCommand({
 
     if (flags.push) {
       console.log('-->', 'Pushing built artifact to', flags.push, '...');
-      await pushFullArtifact(store, digest, flags.push);
+      await oci.pushFullArtifact(store, digest, flags.push);
     }
   },
 });
