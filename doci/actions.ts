@@ -30,7 +30,7 @@ export async function buildSimpleImage(opts: {
     // Cache and typecheck the module before we even consider emitting
     await ctx.cacheSpecifier(opts.mainSpecifier, opts.cacheFlags);
 
-    // Keep it simple - always stack the layers linearly
+    // Keep layering simple - always stack the layers linearly
     let baseSpecifier: string | undefined = undefined;
     for (const specifier of opts.depSpecifiers) {
       console.error('-->', 'Packing', specifier, '...');
@@ -43,6 +43,7 @@ export async function buildSimpleImage(opts: {
       baseSpecifier = layer.mainSpecifier;
     }
 
+    // Add the entrypoint layer
     console.error('-->', 'Packing', opts.mainSpecifier, '...');
     const mainLayer = await ctx.addLayer(opts.mainSpecifier, {
       baseSpecifier,
@@ -51,6 +52,7 @@ export async function buildSimpleImage(opts: {
       cacheFlags: opts.cacheFlags,
     });
 
+    // Write out our artifact locally, including configuration
     const finalDigest = await ctx.storeTo(opts.store, {
       builtWith: Deno.version,
       entrypoint: mainLayer.mainSpecifier,

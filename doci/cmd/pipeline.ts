@@ -45,7 +45,7 @@ export const buildCommand = defineCommand({
     output: {
       short: 'o',
       typeFn: String,
-      description: 'Select what is printed to stdout (options: "output")',
+      description: 'Select what is printed to stdout (options: "digest")',
     },
   },
   async run(args, flags) {
