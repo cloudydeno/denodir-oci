@@ -209,6 +209,8 @@ export async function buildDenodirLayer(opts: {
   const tar = new Tar();
 
   const addedPaths = new Set<string>;
+
+  const textEncoder = new TextEncoder();
   async function addFromUrl(rawUrl: string) {
     const url = new URL(rawUrl);
     const hashString = url.pathname + url.search;
@@ -216,8 +218,7 @@ export async function buildDenodirLayer(opts: {
     const cachePath = path.join(prefix, 'remote',
       url.protocol.replace(/:$/, ''),
       url.hostname,
-      await oci.sha256string(hashString));
-    // console.log('redirect', fromUrl, 'to', cachePath)
+      await oci.sha256bytesToHex(textEncoder.encode(hashString)));
 
     if (addedPaths.has(cachePath)) return;
     addedPaths.add(cachePath);
