@@ -1,15 +1,40 @@
-import {
+import type {
   ManifestOCIDescriptor,
   ManifestOCI,
+} from "@cloudydeno/docker-registry-client";
+import type {
   ModuleGraphJson,
-  assertEquals,
-  Tar,
-  Buffer,
-  path,
-  readableStreamFromReader,
-  oci,
-} from "../deps.ts";
+  ModuleJson,
+} from "@deno/graph";
+import {
+  fromFileUrl,
+  toFileUrl,
+  join as joinPath,
+  parse as parsePath,
+  relative as relativePath,
+  resolve as resolvePath,
+  isAbsolute,
+} from "@std/path";
+import {
+  gzipStream,
+  OciStoreApi,
+  sha256bytes,
+  sha256stream,
+  stableJsonSerialize,
+} from "@cloudydeno/oci-toolkit";
+import {
+  map,
+} from "@cloudydeno/stream-observables/transforms/map.ts";
+
+  // assertEquals,
+  // Tar,
+  // Buffer,
+  // path,
+  // readableStreamFromReader,
+  // oci,
 import type { DenodirArtifactConfig } from "./types.ts";
+import { assertEquals } from "@std/assert/equals";
+import { TarStream, TarStreamInput } from "@std/tar/tar-stream";
 
 export class BuildContext {
   tempDir = Deno.makeTempDirSync({prefix: 'denodir-oci-build-'});
@@ -41,6 +66,7 @@ export class BuildContext {
   async addLayer(specifier: string, opts: {
     baseSpecifier?: string;
     includeBuildInfo?: boolean;
+    includeConfigFile?: boolean;
     localFileRoot?: string;
     cacheFlags: string[];
   }) {
@@ -57,9 +83,10 @@ export class BuildContext {
 
     const layer = await buildDenodirLayer({
       specifier,
-      dataPath: path.join(this.tempDir, `layer-${this.layers.length+1}.tar.gz`),
+      dataPath: joinPath(this.tempDir, `layer-${this.layers.length+1}.tar.gz`),
       baseLayer: this.layers.find(x => x.mainSpecifier == opts.baseSpecifier),
       includeBuildInfo: opts.includeBuildInfo,
+      includeConfigFile: opts.includeConfigFile,
       localFileRoot: opts.localFileRoot,
       denoFlags: flags,
     });
@@ -67,7 +94,7 @@ export class BuildContext {
     return layer;
   }
 
-  async storeTo(store: oci.OciStoreApi, config: DenodirArtifactConfig) {
+  async storeTo(store: OciStoreApi, config: DenodirArtifactConfig) {
     if (this.layers.length < 1) throw new Error(
       `Need at least one layer to make a manifest`);
     if (this.layers.some(x => !x.descriptor?.digest)) throw new Error(
@@ -82,7 +109,7 @@ export class BuildContext {
     this.config = config;
     this.configBlob = await store.putLayerFromBytes('blob', {
       mediaType: "application/vnd.deno.denodir.config.v1+json",
-    }, oci.stableJsonSerialize(this.config));
+    }, stableJsonSerialize(this.config));
 
     this.manifest = {
       schemaVersion: 2,
@@ -92,7 +119,7 @@ export class BuildContext {
     };
     this.manifestBlob = await store.putLayerFromBytes('manifest', {
       mediaType: this.manifest.mediaType!,
-    }, oci.stableJsonSerialize(this.manifest));
+    }, stableJsonSerialize(this.manifest));
 
     return this.manifestBlob.digest;
   }
@@ -107,12 +134,12 @@ export class BuildContext {
       || x == '--unstable');
     const cacheFlags = [
       ...unstables ?? [],
-      ...runtimeFlags?.includes('--no-check') ? ['--no-check'] : [], // TODO: deno 2 changed the default
+      ...runtimeFlags?.includes('--no-check') ? ['--no-check'] : ['--check'], // TODO: deno 2 changed the default
       ...allowImports ?? [],
       ...this.globalFlags,
       ...this.cacheFlags,
     ];
-    console.error('+', 'deno', 'cache', ...cacheFlags, '--', specifier);
+    console.error('  +', 'deno', 'cache', ...cacheFlags, '--', specifier);
     const proc = await new Deno.Command('deno', {
       args: ['cache', ...cacheFlags, '--', specifier],
       stdin: 'null',
@@ -127,7 +154,7 @@ export class BuildContext {
 
 export interface DociLayer {
   dataPath: string;
-  buildInfoPath?: string;
+  // buildInfoPath?: string;
   mainSpecifier: string;
   baseLayer?: DociLayer;
   storedSpecifiers: Set<string>;
@@ -141,11 +168,12 @@ export async function buildDenodirLayer(opts: {
   localFileRoot?: string;
   baseLayer?: DociLayer;
   includeBuildInfo?: boolean;
+  includeConfigFile?: boolean;
 }) {
-  if (opts.localFileRoot && !path.isAbsolute(opts.localFileRoot)) throw new Error(
+  if (opts.localFileRoot && !isAbsolute(opts.localFileRoot)) throw new Error(
     `When passed, localFileRoot needs to be an absolute path.`);
 
-  console.error('+', 'deno', 'info', '--json', ...opts.denoFlags, '--', opts.specifier);
+  console.error('  +', 'deno', 'info', '--json', ...opts.denoFlags, '--', opts.specifier);
   const proc = await new Deno.Command('deno', {
     args: ['info', '--json', ...opts.denoFlags, '--', opts.specifier],
     stdin: 'null',
@@ -164,17 +192,17 @@ export async function buildDenodirLayer(opts: {
   }) {
     if (!localFileRoot) throw new Error(
       `Need localFileRoot to process file:// modules`);
-    const rootPath = path.fromFileUrl(fileSpecifier);
+    const rootPath = fromFileUrl(fileSpecifier);
     if (!rootPath.startsWith(localFileRoot)) throw new Error(
       `Root specifier ${fileSpecifier} wasn't underneath localFileRoot ${localFileRoot}`);
-    const subPath = path.relative(localFileRoot, rootPath);
-    const newPath = path.join('denodir', opts?.targetDir || 'deps', 'file', subPath);
+    const subPath = relativePath(localFileRoot, rootPath);
+    const newPath = joinPath('denodir', opts?.targetDir || 'deps', 'file', subPath);
     // console.log({fileSpecifier, subPath, rootPath, newPath})
     // fileSpecifier =
     // console.log({fileSpecifier});
     return {
       virtualPath: newPath,
-      virtualSpecifier: path.toFileUrl(path.parse(rootPath).root + newPath).toString(),
+      virtualSpecifier: toFileUrl(parsePath(rootPath).root + newPath).toString(),
       genPath: 'denodir/gen/file/'+newPath,
     };
   }
@@ -197,8 +225,9 @@ export async function buildDenodirLayer(opts: {
 
   for (const module of data.modules) {
     if (module.error) throw `Deno reported a module error: ${module.error}`;
+    if (module.kind == 'npm') continue;
     if (!module.local && !module.specifier.startsWith('node:')) throw new Error(
-      `Module ${module.specifier} not in local`);
+        `Module ${module.specifier} not in local`);
   }
 
   const firstLocal = data.modules.find(x => x.local?.includes('/remote/'));
@@ -206,24 +235,40 @@ export async function buildDenodirLayer(opts: {
   const prefixLength = firstLocal.local.indexOf('/remote/') + 1;
   const prefix = firstLocal.local.slice(0, prefixLength);
 
-  const tar = new Tar();
+  const tarEntries = new Array<{
+    name: string,
+    filePath: string,
+  }>;
 
   const addedPaths = new Set<string>;
+
+  if (opts.includeConfigFile) {
+    for (const file of ['deno.json', 'deno.lock']) {
+      const exists = await Deno.stat(file).then(() => true, () => false);
+      if (!exists) continue;
+      tarEntries.push({
+        name: 'denodir/deps/file/'+file,
+        filePath: file,
+        // mtime: 0,
+      });
+    }
+  }
 
   const textEncoder = new TextEncoder();
   async function addFromUrl(rawUrl: string) {
     const url = new URL(rawUrl);
     const hashString = url.pathname + url.search;
     // TODO: nonstandard port is _PORT or something
-    const cachePath = path.join(prefix, 'remote',
+    const cachePath = joinPath(prefix, 'remote',
       url.protocol.replace(/:$/, ''),
       url.hostname,
-      await oci.sha256bytesToHex(textEncoder.encode(hashString)));
+      await sha256bytes(textEncoder.encode(hashString)));
 
     if (addedPaths.has(cachePath)) return;
     addedPaths.add(cachePath);
 
-    await tar.append('denodir/'+cachePath.slice(prefixLength), {
+    tarEntries.push({
+      name: 'denodir/'+cachePath.slice(prefixLength),
       filePath: cachePath,
       // ...await cleanDepsMeta(cachePath),
       // mtime: 0,
@@ -239,6 +284,9 @@ export async function buildDenodirLayer(opts: {
       // https://jsr.io/docs/api
       await addFromUrl(`https://${host}/${scope}/${name}/meta.json`);
       await addFromUrl(`https://${host}/${scope}/${name}/${version}_meta.json`);
+
+    } else if (fromUrl.startsWith('npm:')) {
+      // do nothing?
     } else {
       await addFromUrl(fromUrl);
     }
@@ -252,12 +300,52 @@ export async function buildDenodirLayer(opts: {
     layer.storedSpecifiers.add(module.specifier);
     // console.log(module.specifier, module.local, module.emit);
 
-    let emitPathRemap: string | null = null;
+    if (module.kind == 'npm') {
+      const {npmPackage} = module as ModuleJson & {npmPackage?: string};
+      if (!npmPackage) throw new Error(`BUG: missing npmPackage field`);
+      const [pkgName, version] = npmPackage.split(/(?!^)@/);
+
+      const srcDir = resolvePath(Deno.env.get('HOME') ?? '/', `.cache/deno/npm/registry.npmjs.org`);
+
+      const registrySpeci = `npm:${pkgName}/registry.json`;
+      if (!layer.storedSpecifiers.has(registrySpeci)) {
+        layer.storedSpecifiers.add(registrySpeci);
+        tarEntries.push({
+          name: `denodir/npm/registry.npmjs.org/${pkgName}/registry.json`,
+          filePath: `${srcDir}/${pkgName}/registry.json`,
+        });
+      }
+
+      const args = ['-type', 'f', `${pkgName}/${version}`];
+      console.error('  + find', args.join(' '));
+      const findOutput = await new Deno.Command('find', {
+        args: [
+          `${pkgName}/${version}`,
+          '-type', 'f',
+        ],
+        cwd: srcDir,
+        stdout: 'piped',
+        stderr: 'inherit',
+      }).output();
+
+      const files = new TextDecoder().decode(findOutput.stdout).trimEnd().split('\n');
+      for (const file of files) {
+        tarEntries.push({
+          name: `denodir/npm/registry.npmjs.org/${file}`,
+          filePath: `${srcDir}/${file}`,
+        });
+      }
+
+      continue;
+    }
+
+    // let emitPathRemap: string | null = null;
 
     if (!module.local) throw new Error(`Module ${module.specifier} not local`);
     if (module.local.startsWith(prefix)) {
       // TODO: clean the metadata - the gen metadata is a set of complex deno hashes
-      await tar.append('denodir/'+module.local.slice(prefixLength), {
+      tarEntries.push({
+        name: 'denodir/'+module.local.slice(prefixLength),
         filePath: module.local,
         // ...await cleanDepsMeta(module.local),
         // mtime: 0,
@@ -265,7 +353,8 @@ export async function buildDenodirLayer(opts: {
       if (module.mediaType == 'TypeScript') {
         const genSubpath = module.local.slice(prefixLength).replace(/^remote/, 'gen')+'.js';
         if (prefix+genSubpath == module.local) throw new Error(`failed to get gen path for ${genSubpath}`);
-        await tar.append('denodir/'+genSubpath, {
+        tarEntries.push({
+          name: 'denodir/'+genSubpath,
           filePath: prefix+genSubpath,
           // ...await cleanDepsMeta(prefix+genSubpath),
           // mtime: 0,
@@ -279,40 +368,51 @@ export async function buildDenodirLayer(opts: {
       // if (!opts.localFileRoot || !rootPath.startsWith(opts.localFileRoot)) throw new Error(
       //   `Dep specifier ${module.local} wasn't underneath localFileRoot ${opts.localFileRoot}`);
       // const subPath = path.relative(rootPath, rootSpecifier);
-      // const newPath = path.join('denodir', 'deps', 'file', subPath);
+      // const newPath = joinPath('denodir', 'deps', 'file', subPath);
       // console.log(module);
       const newLoc = rewriteFilePath(module.specifier);
 
-      await tar.append(newLoc.virtualPath, {
+      tarEntries.push({
+        name: newLoc.virtualPath,
         filePath: module.local,
         // mtime: 0,
       });
 
-      emitPathRemap = newLoc.genPath;
+      // emitPathRemap = newLoc.genPath;
     } else {
       throw new Error(`Don't know how to handle local side of module: ${module.specifier}`);
     }
 
     // Only compiled artifacts have these
-    if (module.emit) {
-      throw new Error(`TODO: what does module.emit mean in Deno 2?`);
+    // if (module.emit) {
+    //   throw new Error(`TODO: what does module.emit mean in Deno 2?`);
       // assert(module.emit.startsWith(prefix));
       // const emitPath = emitPathRemap ?? `denodir/${module.emit.slice(prefixLength).replace(/\.[^.]+$/, '')}`;
       // const emitExt = path.extname(module.emit);
 
-      // await tar.append(emitPath+emitExt, {
+      // await tarEntries.push({
+      // name: emitPath+emitExt,
       //   filePath: module.emit,
       //   mtime: 0,
       // });
       // const metaPath = module.emit.replace(/\.[^.]+$/, '')+'.meta';
-      // await tar.append(emitPath+'.meta', {
+      // await tarEntries.push({
+      // name: emitPath+'.meta',
       //   filePath: metaPath,
       //   mtime: 0,
       // });
-    }
+    // }
   }
 
-  const tarStream = readableStreamFromReader(tar.getReader());
+  const tarStream = ReadableStream.from(tarEntries)
+    .pipeThrough(map(async item => ({
+      path: item.name,
+      size: (await Deno.stat(item.filePath)).size,
+      readable: (await Deno.open(item.filePath)).readable,
+      type: "file",
+    }) satisfies TarStreamInput))
+    .pipeThrough(new TarStream);
+    // .pipeThrough(new CompressionStream('gzip'))
   const targetFile = await Deno.open(layer.dataPath, {
     create: true,
     truncate: true,
@@ -336,54 +436,57 @@ export async function buildDenodirLayer(opts: {
     },
   };
 
-  const rootModule = data.modules.find(x =>
-    data.roots.includes(data.redirects[x.specifier] ?? x.specifier));
+  assertEquals(data.roots.length, 1);
+  const rootUrl = data.redirects[data.roots[0]] ?? data.roots[0];
+  const rootModule = data.modules.find(x => rootUrl == (data.redirects[x.specifier] ?? x.specifier));
   if (!rootModule) throw new Error(`No root module found in graph`);
-  layer.buildInfoPath = rootModule.emit?.replace(/\.[^.]+$/, '.buildinfo');
+  // layer.buildInfoPath = rootModule.emit?.replace(/\.[^.]+$/, '.buildinfo');
 
   return layer;
 }
 
-async function cleanDepsMeta(filePath: string) {
-  let rawFile = await Deno.readFile(filePath);
-  const lastNewline = rawFile.findLastIndex(value => value == 10);
-  if (lastNewline > 0) {
-    const rawLastLine = rawFile.slice(lastNewline);
-    const sentinel = new TextEncoder().encode('// denoCacheMetadata=');
-    if (rawLastLine.slice(1, sentinel.length+1).join(',') == sentinel.join(',')) {
-      const rawMetadata = new TextDecoder().decode(rawLastLine.slice(sentinel.length+1));
-      const cleanMetadata = cleanDepsMetaInner(rawMetadata);
-      // Produce a new version of the file buffer
-      const cleanFile = new Uint8Array(lastNewline+1+sentinel.length+cleanMetadata.length);
-      cleanFile.set(rawFile.slice(0, lastNewline+1+sentinel.length), 0);
-      cleanFile.set(cleanMetadata, lastNewline+1+sentinel.length);
-      rawFile = cleanFile;
-    }
-  }
-  return {
-    reader: new Buffer(rawFile),
-    contentSize: rawFile.byteLength,
-  };
-}
+// deno 2 has stronger hashes, so this cleaning is now destructive
 
-function cleanDepsMetaInner(metadata: string) {
-  const meta = JSON.parse(metadata);
+// async function cleanDepsMeta(filePath: string) {
+//   let rawFile = await Deno.readFile(filePath);
+//   const lastNewline = rawFile.findLastIndex(value => value == 10);
+//   if (lastNewline > 0) {
+//     const rawLastLine = rawFile.slice(lastNewline);
+//     const sentinel = new TextEncoder().encode('// denoCacheMetadata=');
+//     if (rawLastLine.slice(1, sentinel.length+1).join(',') == sentinel.join(',')) {
+//       const rawMetadata = new TextDecoder().decode(rawLastLine.slice(sentinel.length+1));
+//       const cleanMetadata = cleanDepsMetaInner(rawMetadata);
+//       // Produce a new version of the file buffer
+//       const cleanFile = new Uint8Array(lastNewline+1+sentinel.length+cleanMetadata.length);
+//       cleanFile.set(rawFile.slice(0, lastNewline+1+sentinel.length), 0);
+//       cleanFile.set(cleanMetadata, lastNewline+1+sentinel.length);
+//       rawFile = cleanFile;
+//     }
+//   }
+//   return {
+//     reader: new Buffer(rawFile),
+//     contentSize: rawFile.byteLength,
+//   };
+// }
 
-  delete meta.headers['date'];
-  delete meta.headers['report-to'];
-  delete meta.headers['expect-ct'];
-  delete meta.headers['cf-ray'];
-  delete meta.headers['x-amz-cf-id'];
-  delete meta.headers['x-amz-request-id'];
-  delete meta.headers['x-amz-id-2'];
-  if (meta.headers.server?.startsWith('deploy/')) {
-    meta.headers.server = 'deploy/...';
-  }
+// function cleanDepsMetaInner(metadata: string) {
+//   const meta = JSON.parse(metadata);
 
-  delete meta.time;
+//   delete meta.headers['date'];
+//   delete meta.headers['report-to'];
+//   delete meta.headers['expect-ct'];
+//   delete meta.headers['cf-ray'];
+//   delete meta.headers['x-amz-cf-id'];
+//   delete meta.headers['x-amz-request-id'];
+//   delete meta.headers['x-amz-id-2'];
+//   if (meta.headers.server?.startsWith('deploy/')) {
+//     meta.headers.server = 'deploy/...';
+//   }
 
-  return oci.stableJsonSerialize(meta);
-}
+//   delete meta.time;
+
+//   return stableJsonSerialize(meta);
+// }
 
 
 /**
@@ -401,11 +504,11 @@ function cleanDepsMetaInner(metadata: string) {
   targetStream: WritableStream<Uint8Array>,
 ) {
   const [rawLeft, rawRight] = sourceData.tee();
-  const uncompressedHashPromise = oci.sha256stream(rawLeft);
-  const [compressedData, compressionStatsPromise] = oci.gzipStream(rawRight);
+  const uncompressedHashPromise = sha256stream(rawLeft);
+  const [compressedData, compressionStatsPromise] = gzipStream(rawRight);
 
   const [gzipLeft, gzipRight] = compressedData.tee();
-  const compressedHashPromise = oci.sha256stream(gzipLeft);
+  const compressedHashPromise = sha256stream(gzipLeft);
   const storagePromise = gzipRight.pipeTo(targetStream);
 
   const [

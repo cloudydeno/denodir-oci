@@ -1,11 +1,12 @@
+import { defineCommand } from "komando";
 import {
-  defineCommand,
-  parseYaml,
-  path,
-  oci,
-} from "../../deps.ts";
+  resolve as resolvePath,
+  dirname as dirnamePath,
+} from "@std/path";
+import { parse as parseYaml } from "@std/yaml";
 
 import { buildSimpleImage, die, ejectArtifact, exportTarArchive } from "../actions.ts";
+import { newInMemoryStore, newLocalStore, OciStoreApi, pushFullArtifact } from "@cloudydeno/oci-toolkit";
 
 interface DociConfigLayer {
   specifier: string;
@@ -53,12 +54,12 @@ export const buildCommand = defineCommand({
     const config = parseYaml(configText) as DociConfig;
 
     const finalDigest = await buildSimpleImage({
-      store: await oci.newLocalStore(),
+      store: await newLocalStore(),
       cacheFlags: config.cacheFlags ?? [],
       runtimeFlags: config.runtimeFlags ?? [],
       depSpecifiers: config.dependencyLayers?.map(x => x.specifier) ?? [],
       mainSpecifier: config.entrypoint.specifier,
-      localFileRoot: path.resolve(path.dirname(flags.config), config.localFileRoot ?? '.'),
+      localFileRoot: resolvePath(dirnamePath(flags.config), config.localFileRoot ?? '.'),
       imports: config.importmap?.imports,
     });
 
@@ -66,7 +67,7 @@ export const buildCommand = defineCommand({
       console.log(finalDigest);
     }
 
-    const fullPath = path.resolve(config.entrypoint.specifier);
+    const fullPath = resolvePath(config.entrypoint.specifier);
     localStorage.setItem(`specifier_${fullPath}`, finalDigest);
 
     const githubOutput = Deno.env.get('GITHUB_OUTPUT');
@@ -122,7 +123,7 @@ export const exportCommand = defineCommand({
     if (flags.output == '-' && Deno.stdout.isTerminal()) throw die
       `Refusing to write a tarball to a TTY, please redirect stdout`;
 
-    const fullPath = path.resolve(config.entrypoint.specifier);
+    const fullPath = resolvePath(config.entrypoint.specifier);
     const knownDigest = localStorage.getItem(`specifier_${fullPath}`);
     if (!knownDigest) throw die
       `No existing digest for ${fullPath} - did you not already build?`;
@@ -134,9 +135,9 @@ export const exportCommand = defineCommand({
       format: flags.format,
       targetRef: target.ref,
 
-      baseStore: await oci.newLocalStore('base-storage'),
-      dociStore: await oci.newLocalStore(),
-      stagingStore: oci.newInMemoryStore(),
+      baseStore: await newLocalStore('base-storage'),
+      dociStore: await newLocalStore(),
+      stagingStore: newInMemoryStore(),
       targetStream: flags.output == '-'
         ? Deno.stdout.writable
         : await Deno.open(flags.output, {
@@ -168,7 +169,7 @@ export const pushCommand = defineCommand({
     const configText = await Deno.readTextFile(flags.config);
     const config = parseYaml(configText) as DociConfig;
 
-    const fullPath = path.resolve(config.entrypoint.specifier);
+    const fullPath = resolvePath(config.entrypoint.specifier);
     const knownDigest = localStorage.getItem(`specifier_${fullPath}`);
     if (!knownDigest) throw die
       `No digest found for ${fullPath}`;
@@ -181,19 +182,19 @@ export const pushCommand = defineCommand({
       `Target ${flags.target} not found in config file ${flags.config}`;
 
     if (!target.baseRef) {
-      await oci.pushFullArtifact(await oci.newLocalStore(), knownDigest, target.ref, flags.tag);
+      await pushFullArtifact(await newLocalStore(), knownDigest, target.ref, flags.tag);
 
     } else {
       const {ejected, store} = await ejectArtifact({
         baseRef: target.baseRef,
         digest: knownDigest,
 
-        baseStore: await oci.newLocalStore('base-storage'),
-        dociStore: await oci.newLocalStore(),
-        stagingStore: oci.newInMemoryStore(),
+        baseStore: await newLocalStore('base-storage'),
+        dociStore: await newLocalStore(),
+        stagingStore: newInMemoryStore(),
       });
 
-      await oci.pushFullArtifact(store, ejected.digest, target.ref, flags.tag);
+      await pushFullArtifact(store, ejected.digest, target.ref, flags.tag);
     }
   }});
 
@@ -218,7 +219,7 @@ export const pushCommand = defineCommand({
       const configText = await Deno.readTextFile(flags.config);
       const config = parseYaml(configText) as DociConfig;
 
-      const fullPath = path.resolve(config.entrypoint.specifier);
+      const fullPath = resolvePath(config.entrypoint.specifier);
       const knownDigest = localStorage.getItem(`specifier_${fullPath}`);
       if (!knownDigest) throw die
         `No digest found for ${fullPath}`;
@@ -230,8 +231,8 @@ export const pushCommand = defineCommand({
       if (!target) throw die
         `Target ${params.target} not found in config file ${flags.config}`;
 
-      const localStore = await oci.newLocalStore('storage');
-      let originStore: oci.OciStoreApi = localStore;
+      const localStore = await newLocalStore('storage');
+      let originStore: OciStoreApi = localStore;
       let originDigest = knownDigest;
 
       // Perform an ejection if requested
@@ -240,9 +241,9 @@ export const pushCommand = defineCommand({
           baseRef: target.baseRef,
           digest: knownDigest,
 
-          baseStore: await oci.newLocalStore('base-storage'),
+          baseStore: await newLocalStore('base-storage'),
           dociStore: localStore,
-          stagingStore: oci.newInMemoryStore(),
+          stagingStore: newInMemoryStore(),
         });
 
         originStore = store;
@@ -262,7 +263,7 @@ export const pushCommand = defineCommand({
       }
 
       for (const destination of params.destinations) {
-        await oci.pushFullArtifact(originStore, originDigest, destination);
+        await pushFullArtifact(originStore, originDigest, destination);
       }
     }});
 

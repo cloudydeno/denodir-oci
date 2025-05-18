@@ -1,4 +1,5 @@
-import { defineCommand, oci } from "../../deps.ts";
+import { newLocalStore, pullFullArtifact } from "@cloudydeno/oci-toolkit";
+import { defineCommand } from "komando";
 
 export const pullCommand = defineCommand({
   name: 'pull',
@@ -12,5 +13,5 @@ export const pullCommand = defineCommand({
   flags: {
   },
   async run(args, flags) {
-    await oci.pullFullArtifact(await oci.newLocalStore(), args.remote);
+    await pullFullArtifact(await newLocalStore(), args.remote);
   }});

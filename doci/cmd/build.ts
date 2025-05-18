@@ -1,5 +1,6 @@
-import { defineCommand, oci } from "../../deps.ts";
+import { defineCommand } from "komando";
 import { buildSimpleImage } from "../actions.ts";
+import { newLocalStore, pushFullArtifact } from "@cloudydeno/oci-toolkit";
 
 export const buildCommand = defineCommand({
   name: 'build',
@@ -35,7 +36,7 @@ export const buildCommand = defineCommand({
       ...(flags.skipCheck ? ['--no-check'] : []),
     ];
 
-    const store = await oci.newLocalStore();
+    const store = await newLocalStore();
     const mainSpecifier = args.specifiers.pop()!;
 
     const digest = await buildSimpleImage({
@@ -49,7 +50,7 @@ export const buildCommand = defineCommand({
 
     if (flags.push) {
       console.log('-->', 'Pushing built artifact to', flags.push, '...');
-      await oci.pushFullArtifact(store, digest, flags.push);
+      await pushFullArtifact(store, digest, flags.push);
     }
   },
 });

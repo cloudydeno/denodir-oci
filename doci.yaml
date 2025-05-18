@@ -2,7 +2,7 @@ entrypoint:
   specifier: doci/mod.ts
 
 dependencyLayers:
-- specifier: deps.ts
+- specifier: "@cloudydeno/oci-toolkit"
 
 runtimeFlags:
 - --allow-read

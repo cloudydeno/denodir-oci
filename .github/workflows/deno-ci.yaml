@@ -3,9 +3,6 @@ name: CI
 on:
   push:
     branches: [ main ]
-    tags: [ v* ]
-    paths-ignore:
-      - '*.md'
   pull_request: {}
 
 jobs:
@@ -19,9 +16,9 @@ jobs:
     strategy:
       matrix:
         deno-version:
-        - v2.0
         - v2.1
         - v2.2
+        - v2.3
         - canary
       fail-fast: false # run each branch to completion
 
@@ -34,119 +31,29 @@ jobs:
       with:
         deno-version: ${{ matrix.deno-version }}
 
-    # "https" cache: code from the Internet
-    - name: Cache https://
+    - name: Cache Deno
       uses: actions/cache@v4
       with:
-        path: |
-          ~/.cache/deno/remote/https
-          ~/.cache/deno/gen/https
-        key: deno-https/v2-${{ github.sha }}
-        restore-keys: deno-https/v2-
+        path: ~/.cache/deno
+        key: denodir/v1-${{ github.sha }}
+        restore-keys: denodir/v1-
 
-    - name: Check doci/mod.ts
-      run: time deno check doci/mod.ts
+    - name: Check publish rules
+      run: time deno publish --dry-run
 
-    - name: Build and run doci/mod.ts
-      run: time ./doci/mod.ts run --digest "$(./doci/mod.ts pipeline build -o digest)" -- --version
-
-    - name: Build example artifacts - colors
-      env:
-        DOCI_CONFIG_FILE: registry/examples/colors.yaml
-      run: |
-        time ./doci/mod.ts pipeline build
-        time ./doci/mod.ts pipeline export --target alpine | docker load
-        time docker run --rm --read-only deno.dir/examples/colors
-
-    - name: Build example artifacts - flags
-      env:
-        DOCI_CONFIG_FILE: registry/examples/flags.yaml
-      run: |
-        time ./doci/mod.ts pipeline build
-        time ./doci/mod.ts pipeline export --target alpine | docker load
-        time docker run --rm --read-only deno.dir/examples/flags --hello=world yup
-
-    - name: Build example artifacts - welcome
-      env:
-        DOCI_CONFIG_FILE: registry/examples/welcome.yaml
-      run: |
-        time ./doci/mod.ts pipeline build
-        time ./doci/mod.ts pipeline export --target alpine | docker load
-        time docker run --rm --read-only deno.dir/examples/welcome
-
-  # Push image to GitHub Packages.
-  # See also https://docs.docker.com/docker-hub/builds/
-  push:
-    name: 'Push container image'
+  publish:
     runs-on: ubuntu-latest
+    needs: check
+    if: github.event_name == 'push'
+
     permissions:
       contents: read
-      packages: write
-      attestations: write
       id-token: write
 
-    env:
-      REGISTRY: ghcr.io
-      IMAGE_NAME: cloudydeno/doci-cli
-
-    needs: check
     steps:
-      - uses: actions/checkout@v4
+    - uses: denoland/setup-deno@v2
 
-      - name: Use Deno stable
-        uses: denoland/setup-deno@v2
-        with:
-          deno-version: v2.1
-      - name: Cache https://
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/deno/remote/https
-            ~/.cache/deno/gen/https
-          key: deno-doci-https/v2-${{ github.sha }}
-          restore-keys: deno-doci-https/v2-
-      - name: Install denodir-oci utility
-        run: deno install --global --allow-read --allow-write=$HOME,${TMPDIR:-/tmp} --allow-run --allow-net --allow-env doci/mod.ts
+    - uses: actions/checkout@v4
 
-      - name: Log in to the Container registry
-        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804
-        env:
-          DOCKER_METADATA_SET_OUTPUT_ENV: false
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=sha
-            type=ref,event=pr
-            type=ref,event=tag
-            type=edge,branch=main
-
-      - name: Build denodir
-        id: build
-        run: doci pipeline build
-
-      - name: Push alpine tags
-        id: push
-        env:
-          doci_target: alpine
-          doci_destinations: ${{ steps.meta.outputs.tags }}
-          doci_labels: ${{ steps.meta.outputs.labels }}
-        run: doci pipeline push-all
-
-      # TODO: redo image attestations to integrate with the artifact index?
-      # The separate tag for the attestation is a UX issue.
-      # e.g. https://docs.docker.com/build/metadata/attestations/attestation-storage/
-      # - name: Generate artifact attestation
-      #   uses: actions/attest-build-provenance@v2
-      #   if: ${{ github.ref == 'refs/heads/main' }}
-      #   with:
-      #     subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-      #     subject-digest: ${{ steps.push.outputs.digest }}
-      #     push-to-registry: true
+    - name: Publish now
+      run: deno publish

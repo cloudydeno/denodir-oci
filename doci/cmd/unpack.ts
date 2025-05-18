@@ -1,8 +1,11 @@
 // explode the raw contents of a built artifact into (a temp directory?) for inspection/debugging
 
-import { defineCommand, ManifestOCI, path, oci } from "../../deps.ts";
+import { defineCommand } from "komando";
 import type { DenodirArtifactConfig } from "../../lib/types.ts";
 import { die, extractLayer } from "../actions.ts";
+import { newLocalStore } from "@cloudydeno/oci-toolkit";
+import { ManifestOCI } from "@cloudydeno/docker-registry-client";
+import { join as joinPath } from "@std/path";
 
 export const unpackCommand = defineCommand({
   name: 'unpack',
@@ -37,7 +40,7 @@ export const unpackCommand = defineCommand({
         `The destination folder ${flags.destination} could not be read: ${err.message}`;
     }
 
-    const store = await oci.newLocalStore();
+    const store = await newLocalStore();
 
     const manifestRaw = await store.getFullLayer('manifest', flags.digest);
     const manifest: ManifestOCI = JSON.parse(new TextDecoder().decode(manifestRaw));
@@ -78,7 +81,7 @@ export const unpackCommand = defineCommand({
     }
 
     const denoCmd = [`deno`, `run`, ...runtimeFlags, `--`, `${configData.entrypoint}`];
-    console.error(`$ set -x DENO_DIR`, path.join(flags.destination, 'denodir'));
+    console.error(`$ set -x DENO_DIR`, joinPath(flags.destination, 'denodir'));
     console.error('$', denoCmd
       .map(x => /^[a-z0-9.-]+$/i.test(x) ? x : JSON.stringify(x))
       .join(' '));

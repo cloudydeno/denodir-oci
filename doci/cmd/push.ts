@@ -1,5 +1,6 @@
-import { defineCommand, oci } from "../../deps.ts";
+import { defineCommand } from "komando";
 import { die } from "../actions.ts";
+import { newLocalStore, pushFullArtifact } from "@cloudydeno/oci-toolkit";
 
 export const pushCommand = defineCommand({
   name: 'push',
@@ -20,5 +21,5 @@ export const pushCommand = defineCommand({
     if (!flags.digest.startsWith('sha256:')) throw die
       `--digest should be a sha256:... string`;
 
-    await oci.pushFullArtifact(await oci.newLocalStore(), flags.digest, flags.destination);
+    await pushFullArtifact(await newLocalStore(), flags.digest, flags.destination);
   }});

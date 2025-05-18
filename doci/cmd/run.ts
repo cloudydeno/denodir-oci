@@ -1,5 +1,6 @@
-import { defineCommand, oci } from "../../deps.ts";
+import { defineCommand } from "komando";
 import { die, runArtifact } from "../actions.ts";
+import { newLocalStore } from "@cloudydeno/oci-toolkit";
 
 export const runCommand = defineCommand({
   name: 'run',
@@ -25,7 +26,7 @@ export const runCommand = defineCommand({
     const runtimeFlags = argsAll.slice(0, argsAll.indexOf('--'));
 
     await runArtifact({
-      store: await oci.newLocalStore(),
+      store: await newLocalStore(),
       digest: flags.digest,
       runtimeFlags,
       scriptFlags,

@@ -1,5 +1,6 @@
-import { defineCommand, oci } from "../../deps.ts";
+import { defineCommand } from "komando";
 import { die, exportTarArchive } from "../actions.ts";
+import { newInMemoryStore, newLocalStore } from "@cloudydeno/oci-toolkit";
 
 export const exportCommand = defineCommand({
   name: 'export',
@@ -39,9 +40,9 @@ export const exportCommand = defineCommand({
       format: flags.format,
       targetRef: flags.tag,
 
-      baseStore: await oci.newLocalStore('base-storage'),
-      dociStore: await oci.newLocalStore(),
-      stagingStore: oci.newInMemoryStore(),
+      baseStore: await newLocalStore('base-storage'),
+      dociStore: await newLocalStore(),
+      stagingStore: newInMemoryStore(),
       targetStream: Deno.stdout.writable,
     });
   }});

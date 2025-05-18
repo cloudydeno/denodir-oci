@@ -1,25 +1,21 @@
-import {
-  type ManifestOCI,
-  type ManifestOCIDescriptor,
-  parseRepoAndRef,
-  path,
-  oci,
-} from "../deps.ts";
 
-import { BuildContext, DociLayer } from "../lib/build.ts";
+import { exportArtifactAsArchive, extractTarArchive, newStackedStore, type OciStoreApi, pullFullArtifact, StackedStore } from "@cloudydeno/oci-toolkit";
+import { BuildContext, type DociLayer } from "../lib/build.ts";
 import { ejectToImage } from "../lib/eject-to-image.ts";
 import type { DenodirArtifactConfig } from "../lib/types.ts";
 import { renderImportmapFlag } from "../lib/util/importmap.ts";
+import { type ManifestOCI, type ManifestOCIDescriptor, parseRepoAndRef } from "@cloudydeno/docker-registry-client";
+import { join as joinPath } from "@std/path";
 
 export async function buildSimpleImage(opts: {
-  store: oci.OciStoreApi;
+  store: OciStoreApi;
   depSpecifiers: string[];
   mainSpecifier: string;
   cacheFlags: string[];
   runtimeFlags: string[];
   localFileRoot: string;
   imports?: Record<string,string>;
-}) {
+}): Promise<string> {
   const ctx = new BuildContext();
   try {
 
@@ -37,6 +33,7 @@ export async function buildSimpleImage(opts: {
       const layer: DociLayer = await ctx.addLayer(specifier, {
         baseSpecifier,
         includeBuildInfo: false,
+        includeConfigFile: false,
         localFileRoot: opts.localFileRoot,
         cacheFlags: opts.cacheFlags,
       });
@@ -48,9 +45,12 @@ export async function buildSimpleImage(opts: {
     const mainLayer = await ctx.addLayer(opts.mainSpecifier, {
       baseSpecifier,
       includeBuildInfo: !opts.runtimeFlags?.includes('--no-check'),
+      includeConfigFile: true,
       localFileRoot: opts.localFileRoot,
       cacheFlags: opts.cacheFlags,
     });
+
+    // TODO: allow for adding an assets layer based on fs globs?
 
     // Write out our artifact locally, including configuration
     const finalDigest = await ctx.storeTo(opts.store, {
@@ -71,7 +71,7 @@ export async function buildSimpleImage(opts: {
 
 // TODO: refactor into a RunContext to enable piecemeal usage (extracting, etc)
 export async function runArtifact(opts: {
-  store: oci.OciStoreApi;
+  store: OciStoreApi;
   digest: string;
   runtimeFlags: string[];
   scriptFlags: string[];
@@ -118,7 +118,6 @@ export async function runArtifact(opts: {
     let entrypoint = configData.entrypoint;
     if (entrypoint.startsWith('file:///denodir/')) {
       entrypoint = entrypoint.replace('file://', tempDir);
-      console.error(entrypoint);
     }
 
     const runFlags = [
@@ -146,7 +145,7 @@ export async function runArtifact(opts: {
     const proc = await new Deno.Command(Deno.execPath(), {
       args: denoArgs,
       env: {
-        'DENO_DIR': path.join(tempDir, 'denodir'),
+        'DENO_DIR': joinPath(tempDir, 'denodir'),
         ...(opts.environmentVariables ?? {}),
       },
       stdin: 'inherit',
@@ -166,9 +165,9 @@ export async function runArtifact(opts: {
 }
 
 export async function exportTarArchive(opts: {
-  dociStore: oci.OciStoreApi;
-  baseStore: oci.OciStoreApi;
-  stagingStore: oci.OciStoreApi;
+  dociStore: OciStoreApi;
+  baseStore: OciStoreApi;
+  stagingStore: OciStoreApi;
   digest: string;
   baseRef: string | null;
   targetRef: string;
@@ -178,7 +177,7 @@ export async function exportTarArchive(opts: {
 
   if (!opts.baseRef) {
     console.error(`Exporting to archive...`, opts.digest);
-    await oci.exportArtifactAsArchive({
+    await exportArtifactAsArchive({
       format: opts.format == 'auto' ? 'oci' : opts.format,
       destination: opts.targetStream,
       manifestDigest: opts.digest,
@@ -193,7 +192,7 @@ export async function exportTarArchive(opts: {
     });
 
     console.error(`Exporting to archive...`, ejected.digest);
-    await oci.exportArtifactAsArchive({
+    await exportArtifactAsArchive({
       format: opts.format == 'auto' ? 'docker' : opts.format,
       destination: Deno.stdout.writable,
       manifestDigest: ejected.digest,
@@ -204,19 +203,22 @@ export async function exportTarArchive(opts: {
 }
 
 export async function ejectArtifact(opts: {
-  dociStore: oci.OciStoreApi;
-  baseStore: oci.OciStoreApi;
-  stagingStore: oci.OciStoreApi;
+  dociStore: OciStoreApi;
+  baseStore: OciStoreApi;
+  stagingStore: OciStoreApi;
   digest: string;
   baseRef: string;
-}) {
+}): Promise<{
+  ejected: ManifestOCIDescriptor;
+  store: StackedStore;
+}> {
   // Pull base manifest
   // TODO: can skip pulling if we already have a version of the manifest (by digest?)
-  const baseImage = await oci.pullFullArtifact(opts.baseStore,
+  const baseImage = await pullFullArtifact(opts.baseStore,
     opts.baseRef.replace('$DenoVersion', Deno.version.deno.replace(/\+.+$/, '')));
 
   // Inmemory store for the generated manifest
-  const storeStack = oci.newStackedStore({
+  const storeStack = newStackedStore({
     writable: opts.stagingStore,
     readable: [
       opts.dociStore,
@@ -252,13 +254,13 @@ export async function ejectArtifact(opts: {
   };
 }
 
-export async function extractLayer(store: oci.OciStoreApi, layer: ManifestOCIDescriptor, destFolder: string) {
+export async function extractLayer(store: OciStoreApi, layer: ManifestOCIDescriptor, destFolder: string) {
   if (!layer.mediaType.endsWith('.tar+gzip')) die
     `Cannot extract non-tarball layer ${layer.mediaType}`;
 
   const layerReader = await store.getLayerStream('blob', layer.digest);
   const unzippedStream = layerReader.pipeThrough(new DecompressionStream('gzip'));
-  await oci.extractTarArchive(unzippedStream, destFolder);
+  await extractTarArchive(unzippedStream, destFolder);
 }
 
 export function die(template: TemplateStringsArray, ...stuff: unknown[]) {

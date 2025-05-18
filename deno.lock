@@ -1,0 +1,127 @@
+{
+  "version": "5",
+  "specifiers": {
+    "jsr:@cloudydeno/docker-registry-client@0.6": "0.6.0",
+    "jsr:@cloudydeno/docker-registry-client@0.6.0": "0.6.0",
+    "jsr:@cloudydeno/oci-toolkit@0.2": "0.2.0",
+    "jsr:@cloudydeno/stream-observables@1": "1.4.1",
+    "jsr:@cloudydeno/stream-observables@1.4.1": "1.4.1",
+    "jsr:@cloudydeno/stream-observables@^1.4.1": "1.4.1",
+    "jsr:@deno-library/progress@1.5.1": "1.5.1",
+    "jsr:@deno/graph@0.91": "0.91.0",
+    "jsr:@std/assert@1": "1.0.13",
+    "jsr:@std/assert@1.0.13": "1.0.13",
+    "jsr:@std/assert@^1.0.13": "1.0.13",
+    "jsr:@std/bytes@^1.0.2": "1.0.5",
+    "jsr:@std/bytes@^1.0.5": "1.0.5",
+    "jsr:@std/crypto@1.0.4": "1.0.4",
+    "jsr:@std/fmt@1.0.3": "1.0.3",
+    "jsr:@std/internal@^1.0.6": "1.0.6",
+    "jsr:@std/io@0.225": "0.225.0",
+    "jsr:@std/io@0.225.0": "0.225.0",
+    "jsr:@std/path@1": "1.0.9",
+    "jsr:@std/path@1.0.9": "1.0.9",
+    "jsr:@std/path@^1.0.9": "1.0.9",
+    "jsr:@std/streams@1": "1.0.9",
+    "jsr:@std/streams@^1.0.9": "1.0.9",
+    "jsr:@std/tar@0.1": "0.1.6",
+    "jsr:@std/tar@0.1.6": "0.1.6",
+    "jsr:@std/tar@~0.1.6": "0.1.6",
+    "jsr:@std/yaml@1": "1.0.6",
+    "npm:komando@1": "1.0.3"
+  },
+  "jsr": {
+    "@cloudydeno/docker-registry-client@0.6.0": {
+      "integrity": "8853d3f97b999da4359ff4f792776e7e2da1fc958a7210c659e8cfe92d679b76",
+      "dependencies": [
+        "jsr:@std/crypto"
+      ]
+    },
+    "@cloudydeno/oci-toolkit@0.2.0": {
+      "integrity": "8d5b8090580f9cfd7a1ffa4952976f52c97eae4c7aba98c9e2a5ceea13bc7594",
+      "dependencies": [
+        "jsr:@cloudydeno/docker-registry-client@0.6.0",
+        "jsr:@cloudydeno/stream-observables@1.4.1",
+        "jsr:@deno-library/progress",
+        "jsr:@std/assert@1.0.13",
+        "jsr:@std/path@1.0.9",
+        "jsr:@std/tar@0.1.6"
+      ]
+    },
+    "@cloudydeno/stream-observables@1.4.1": {
+      "integrity": "555aa3d786fcfd066d096fc943ea47afc688618e95146e615705e981008f57c0"
+    },
+    "@deno-library/progress@1.5.1": {
+      "integrity": "966611826b8bb27baae73ab1c4fa4317cd4edd2abb99750cd6f8488d22d5b121",
+      "dependencies": [
+        "jsr:@std/fmt",
+        "jsr:@std/io@0.225.0"
+      ]
+    },
+    "@deno/graph@0.91.0": {
+      "integrity": "3633b67eeb2d46cc73cdbbb353018ca1ae4808b188a87257efca34954a8c5855"
+    },
+    "@std/assert@1.0.13": {
+      "integrity": "ae0d31e41919b12c656c742b22522c32fb26ed0cba32975cb0de2a273cb68b29",
+      "dependencies": [
+        "jsr:@std/internal"
+      ]
+    },
+    "@std/bytes@1.0.5": {
+      "integrity": "4465dd739d7963d964c809202ebea6d5c6b8e3829ef25c6a224290fbb8a1021e"
+    },
+    "@std/crypto@1.0.4": {
+      "integrity": "cee245c453bd5366207f4d8aa25ea3e9c86cecad2be3fefcaa6cb17203d79340"
+    },
+    "@std/fmt@1.0.3": {
+      "integrity": "97765c16aa32245ff4e2204ecf7d8562496a3cb8592340a80e7e554e0bb9149f"
+    },
+    "@std/internal@1.0.6": {
+      "integrity": "9533b128f230f73bd209408bb07a4b12f8d4255ab2a4d22a1fd6d87304aca9a4"
+    },
+    "@std/io@0.225.0": {
+      "integrity": "c1db7c5e5a231629b32d64b9a53139445b2ca640d828c26bf23e1c55f8c079b3",
+      "dependencies": [
+        "jsr:@std/bytes@^1.0.2"
+      ]
+    },
+    "@std/path@1.0.9": {
+      "integrity": "260a49f11edd3db93dd38350bf9cd1b4d1366afa98e81b86167b4e3dd750129e"
+    },
+    "@std/streams@1.0.9": {
+      "integrity": "a9d26b1988cdd7aa7b1f4b51e1c36c1557f3f252880fa6cc5b9f37078b1a5035",
+      "dependencies": [
+        "jsr:@std/bytes@^1.0.5"
+      ]
+    },
+    "@std/tar@0.1.6": {
+      "integrity": "7f06a5359518262207e1c28ea965fd552dff3ba2047d2e9225339af287b1f3a4",
+      "dependencies": [
+        "jsr:@std/streams@^1.0.9"
+      ]
+    },
+    "@std/yaml@1.0.6": {
+      "integrity": "c9a5a914e1d51c46756cb10e356710035cfa905e713c90d3b711413fd3aead27"
+    }
+  },
+  "npm": {
+    "komando@1.0.3": {
+      "integrity": "sha512-/rCDK6AmxfRFIF4oCx3gx4judtdYQr+t1lmBDsbvFeiZImcCs6aUuorQyBml8xrGqC6S0acW2ZAu/zLX4NobUA=="
+    }
+  },
+  "workspace": {
+    "dependencies": [
+      "jsr:@cloudydeno/docker-registry-client@0.6",
+      "jsr:@cloudydeno/oci-toolkit@0.2",
+      "jsr:@cloudydeno/stream-observables@1",
+      "jsr:@deno/graph@0.91",
+      "jsr:@std/assert@1",
+      "jsr:@std/io@0.225",
+      "jsr:@std/path@1",
+      "jsr:@std/streams@1",
+      "jsr:@std/tar@0.1",
+      "jsr:@std/yaml@1",
+      "npm:komando@1"
+    ]
+  }
+}
