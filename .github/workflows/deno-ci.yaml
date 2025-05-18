@@ -16,8 +16,6 @@ jobs:
     strategy:
       matrix:
         deno-version:
-        - v2.1
-        - v2.2
         - v2.3
         - canary
       fail-fast: false # run each branch to completion
@@ -35,11 +33,14 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ~/.cache/deno
-        key: denodir/v1-${{ github.sha }}
-        restore-keys: denodir/v1-
+        key: denodir/v1-${{ matrix.deno-version }}-${{ github.sha }}
+        restore-keys: denodir/v1-${{ matrix.deno-version }}-
+
+    - name: Check deno.lock
+      run: deno install --frozen
 
     - name: Check publish rules
-      run: time deno publish --dry-run
+      run: time deno publish --dry-run --allow-dirty
 
   publish:
     runs-on: ubuntu-latest

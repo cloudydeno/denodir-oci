@@ -7,7 +7,7 @@ Install the CLI globally like so:
 
 ```
 # released version
-deno install -f --global --allow-read --allow-write=$HOME,${TMPDIR:-/tmp} --allow-run --allow-net --allow-env jsr:@danopia/doci/cli
+deno install -f --global --allow-read --allow-write=$HOME,${TMPDIR:-/tmp} --allow-run --allow-net --allow-env jsr:@cloudydeno/doci/cli
 
 # latest from git
 deno install -f --global --allow-read --allow-write=$HOME,${TMPDIR:-/tmp} --allow-run --allow-net --allow-env --reload=https://raw.githubusercontent.com https://raw.githubusercontent.com/cloudydeno/denodir-oci/main/doci/mod.ts
