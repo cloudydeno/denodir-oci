@@ -1,6 +1,8 @@
 import { defineCommand } from "komando";
-import { die, runArtifact } from "../actions.ts";
 import { newLocalStore } from "@cloudydeno/oci-toolkit";
+import { addShutdownHandler, shutdownCtlr } from "@cloudydeno/bitesized/system/shutdown";
+
+import { die, runArtifact } from "../actions.ts";
 
 export const runCommand = defineCommand({
   name: 'run',
@@ -25,10 +27,12 @@ export const runCommand = defineCommand({
     const scriptFlags = argsAll.slice(argsAll.indexOf('--') + 1);
     const runtimeFlags = argsAll.slice(0, argsAll.indexOf('--'));
 
+    addShutdownHandler();
     await runArtifact({
       store: await newLocalStore(),
       digest: flags.digest,
       runtimeFlags,
       scriptFlags,
+      signal: shutdownCtlr.signal,
     });
   }});

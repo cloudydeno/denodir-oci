@@ -1,6 +1,7 @@
 {
   "version": "5",
   "specifiers": {
+    "jsr:@cloudydeno/bitesized@1": "1.0.3",
     "jsr:@cloudydeno/docker-registry-client@0.6": "0.6.0",
     "jsr:@cloudydeno/docker-registry-client@0.6.0": "0.6.0",
     "jsr:@cloudydeno/oci-toolkit@0.2": "0.2.0",
@@ -28,9 +29,13 @@
     "jsr:@std/tar@0.1.6": "0.1.6",
     "jsr:@std/tar@~0.1.6": "0.1.6",
     "jsr:@std/yaml@1": "1.0.6",
+    "jsr:@std/yaml@^1.0.6": "1.0.6",
     "npm:komando@1": "1.0.3"
   },
   "jsr": {
+    "@cloudydeno/bitesized@1.0.3": {
+      "integrity": "bba8b4e8931f9fdede8347dee730cdde10f939a50a363b2ff128d5982d30b334"
+    },
     "@cloudydeno/docker-registry-client@0.6.0": {
       "integrity": "8853d3f97b999da4359ff4f792776e7e2da1fc958a7210c659e8cfe92d679b76",
       "dependencies": [
@@ -111,6 +116,7 @@
   },
   "workspace": {
     "dependencies": [
+      "jsr:@cloudydeno/bitesized@1",
       "jsr:@cloudydeno/docker-registry-client@0.6",
       "jsr:@cloudydeno/oci-toolkit@0.2",
       "jsr:@cloudydeno/stream-observables@1",

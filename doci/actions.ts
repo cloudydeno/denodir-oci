@@ -76,6 +76,7 @@ export async function runArtifact(opts: {
   runtimeFlags: string[];
   scriptFlags: string[];
   environmentVariables?: Record<string, string>;
+  signal?: AbortSignal;
 }) {
   const manifestRaw = await opts.store.getFullLayer('manifest', opts.digest);
   const manifest: ManifestOCI = JSON.parse(new TextDecoder().decode(manifestRaw));
@@ -151,6 +152,7 @@ export async function runArtifact(opts: {
       stdin: 'inherit',
       stdout: 'inherit',
       stderr: 'inherit',
+      signal: opts.signal,
     }).output();
 
     exitCode = proc.code || 1;
