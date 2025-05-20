@@ -7,6 +7,10 @@ import { renderImportmapFlag } from "../lib/util/importmap.ts";
 import { type ManifestOCI, type ManifestOCIDescriptor, parseRepoAndRef } from "@cloudydeno/docker-registry-client";
 import { join as joinPath } from "@std/path";
 
+/**
+ * Produces a denodir OCI artifact from the local system's Deno installation.
+ * @returns OCI digest of the created Manifest, which has been saved to `opts.store`.
+ */
 export async function buildSimpleImage(opts: {
   store: OciStoreApi;
   depSpecifiers: string[];
@@ -70,6 +74,9 @@ export async function buildSimpleImage(opts: {
 }
 
 // TODO: refactor into a RunContext to enable piecemeal usage (extracting, etc)
+/**
+ * Extracts a Denodir OCI artifact to a temporary directory and executes it as a subprocess.
+ */
 export async function runArtifact(opts: {
   store: OciStoreApi;
   digest: string;
@@ -166,6 +173,16 @@ export async function runArtifact(opts: {
   }
 }
 
+/**
+ * Produces a tar archive containing a Denodir OCI artifact.
+ * When a base Docker image is provided, the Denodir is ejected/stacked
+ *   onto the base image and a Docker archive is produced by default.
+ *   The archive can be streamed into `docker load` as desired.
+ * When there is no base image, the Denodir is exported as-is
+ *   using a OCI Image Layout structure by default.
+ * If a compressed archive is desired,
+ *   use `.pipeTo(new CompressionStream('gzip'))`
+ */
 export async function exportTarArchive(opts: {
   dociStore: OciStoreApi;
   baseStore: OciStoreApi;
@@ -174,14 +191,12 @@ export async function exportTarArchive(opts: {
   baseRef: string | null;
   targetRef: string;
   format: 'oci' | 'docker' | 'auto';
-  targetStream: WritableStream<Uint8Array>;
-}) {
+}): Promise<ReadableStream<Uint8Array>> {
 
   if (!opts.baseRef) {
     console.error(`Exporting to archive...`, opts.digest);
-    await exportArtifactAsArchive({
+    return await exportArtifactAsArchive({
       format: opts.format == 'auto' ? 'oci' : opts.format,
-      destination: opts.targetStream,
       manifestDigest: opts.digest,
       store: opts.dociStore,
       fullRef: opts.targetRef,
@@ -194,9 +209,8 @@ export async function exportTarArchive(opts: {
     });
 
     console.error(`Exporting to archive...`, ejected.digest);
-    await exportArtifactAsArchive({
+    return await exportArtifactAsArchive({
       format: opts.format == 'auto' ? 'docker' : opts.format,
-      destination: Deno.stdout.writable,
       manifestDigest: ejected.digest,
       store,
       fullRef: parseRepoAndRef(opts.targetRef).canonicalRef,
@@ -204,6 +218,12 @@ export async function exportTarArchive(opts: {
   }
 }
 
+/**
+ * Accepts a digest of a Denodir OCI artifact and a reference to a base image (a normal Deno image).
+ * The Denodir blobs are stacked onto the base image, efficiently producing a combined image.
+ * The resulting image can then be run normally by Docker and/or uploaded to a Docker registry.
+ * @returns A descriptor of the newly created Docker image, and a store API to access it from.
+ */
 export async function ejectArtifact(opts: {
   dociStore: OciStoreApi;
   baseStore: OciStoreApi;
@@ -256,6 +276,12 @@ export async function ejectArtifact(opts: {
   };
 }
 
+/**
+ * Extracts one OCI layer to a local folder.
+ * @param store The store containing the blob.
+ * @param layer Descriptor indicating which blob to extract.
+ * @param destFolder Local path where the files should be written to.
+ */
 export async function extractLayer(store: OciStoreApi, layer: ManifestOCIDescriptor, destFolder: string) {
   if (!layer.mediaType.endsWith('.tar+gzip')) die
     `Cannot extract non-tarball layer ${layer.mediaType}`;
@@ -265,6 +291,7 @@ export async function extractLayer(store: OciStoreApi, layer: ManifestOCIDescrip
   await extractTarArchive(unzippedStream, destFolder);
 }
 
+/** Internal function to produce user-friendly error messages at the CLI. */
 export function die(template: TemplateStringsArray, ...stuff: unknown[]) {
   console.error(`\ndoci:`, String.raw(template, ...stuff.map(x => JSON.stringify(x))), '\n');
   Deno.exit(1);

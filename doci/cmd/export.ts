@@ -34,7 +34,7 @@ export const exportCommand = defineCommand({
     if (Deno.stdout.isTerminal()) throw die
       `Refusing to write a tarball to a TTY, please redirect stdout`;
 
-    await exportTarArchive({
+    const tarStream = await exportTarArchive({
       baseRef: flags.base,
       digest: flags.digest,
       format: flags.format,
@@ -43,6 +43,6 @@ export const exportCommand = defineCommand({
       baseStore: await newLocalStore('base-storage'),
       dociStore: await newLocalStore(),
       stagingStore: newInMemoryStore(),
-      targetStream: Deno.stdout.writable,
     });
+    await tarStream.pipeTo(Deno.stdout.writable);
   }});

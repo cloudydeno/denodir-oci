@@ -1,10 +1,10 @@
 {
   "name": "@cloudydeno/doci",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "imports": {
     "@cloudydeno/bitesized": "jsr:@cloudydeno/bitesized@^1",
     "@cloudydeno/docker-registry-client": "jsr:@cloudydeno/docker-registry-client@^0.6",
-    "@cloudydeno/oci-toolkit": "jsr:@cloudydeno/oci-toolkit@^0.2",
+    "@cloudydeno/oci-toolkit": "jsr:@cloudydeno/oci-toolkit@^0.3",
     "@cloudydeno/stream-observables": "jsr:@cloudydeno/stream-observables@^1",
     "@deno/graph": "jsr:@deno/graph@^0.91",
     "@std/assert": "jsr:@std/assert@^1",

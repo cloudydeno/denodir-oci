@@ -1,12 +1,15 @@
 import { defineCommand } from "komando";
+import { resolve as resolvePath } from "@std/path/resolve";
+import { dirname as dirnamePath } from "@std/path/dirname";
+import { parse as parseYaml } from "@std/yaml/parse";
 import {
-  resolve as resolvePath,
-  dirname as dirnamePath,
-} from "@std/path";
-import { parse as parseYaml } from "@std/yaml";
+  newInMemoryStore,
+  newLocalStore,
+  type OciStoreApi,
+  pushFullArtifact,
+} from "@cloudydeno/oci-toolkit";
 
 import { buildSimpleImage, die, ejectArtifact, exportTarArchive } from "../actions.ts";
-import { newInMemoryStore, newLocalStore, OciStoreApi, pushFullArtifact } from "@cloudydeno/oci-toolkit";
 
 interface DociConfigLayer {
   specifier: string;
@@ -106,7 +109,7 @@ export const exportCommand = defineCommand({
       description: 'Set either "docker" for a legacy archive or "oci" for the modern OCI Image Layout archive. Left alone, "auto" will use "oci" for raw artifacts and "docker" for runnable images',
     },
   },
-  async run(args, flags) {
+  async run(_args, flags) {
     const configText = await Deno.readTextFile(flags.config);
     const config = parseYaml(configText) as DociConfig;
 
@@ -129,7 +132,7 @@ export const exportCommand = defineCommand({
       `No existing digest for ${fullPath} - did you not already build?`;
     console.error(`Using known digest`, knownDigest);
 
-    await exportTarArchive({
+    const tarStream = await exportTarArchive({
       baseRef: target.baseRef ?? null,
       digest: knownDigest,
       format: flags.format,
@@ -138,14 +141,13 @@ export const exportCommand = defineCommand({
       baseStore: await newLocalStore('base-storage'),
       dociStore: await newLocalStore(),
       stagingStore: newInMemoryStore(),
-      targetStream: flags.output == '-'
-        ? Deno.stdout.writable
-        : await Deno.open(flags.output, {
-            write: true,
-            truncate: true,
-            create: true,
-          }).then(x => x.writable),
     });
+
+    if (flags.output == '-') {
+      await tarStream.pipeTo(Deno.stdout.writable);
+    } else {
+      await Deno.writeFile(flags.output, tarStream);
+    }
   }});
 
 export const pushCommand = defineCommand({
