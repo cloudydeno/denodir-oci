@@ -226,6 +226,7 @@ export async function buildDenodirLayer(opts: {
   for (const module of data.modules) {
     if (module.error) throw `Deno reported a module error: ${module.error}`;
     if (module.kind == 'npm') continue;
+    if (module.kind == 'external') continue;
     if (!module.local && !module.specifier.startsWith('node:')) throw new Error(
         `Module ${module.specifier} not in local`);
   }
@@ -336,6 +337,8 @@ export async function buildDenodirLayer(opts: {
         });
       }
 
+      continue;
+    } else if (module.kind == 'external') {
       continue;
     }
 

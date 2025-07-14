@@ -1,6 +1,6 @@
 {
   "name": "@cloudydeno/doci",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "imports": {
     "@cloudydeno/bitesized": "jsr:@cloudydeno/bitesized@^1",
     "@cloudydeno/docker-registry-client": "jsr:@cloudydeno/docker-registry-client@^0.6",

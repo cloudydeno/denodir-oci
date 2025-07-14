@@ -34,6 +34,7 @@ export const buildCommand = defineCommand({
     const denoFlags = [
       ...(flags.unstable ? ['--unstable'] : []),
       ...(flags.skipCheck ? ['--no-check'] : []),
+      '--allow-import',
     ];
 
     const store = await newLocalStore();
