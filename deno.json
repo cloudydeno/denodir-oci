@@ -5,7 +5,7 @@
     "@cloudydeno/bitesized": "jsr:@cloudydeno/bitesized@^1",
     "@cloudydeno/docker-registry-client": "jsr:@cloudydeno/docker-registry-client@^0.7",
     "@cloudydeno/oci-toolkit": "jsr:@cloudydeno/oci-toolkit@^0.4",
-    "@cloudydeno/stream-observables": "jsr:@cloudydeno/stream-observables@^1",
+    "@cloudydeno/stream-observables": "jsr:@cloudydeno/stream-observables@^1.5",
     "@deno/graph": "jsr:@deno/graph@^0.105",
     "@std/assert": "jsr:@std/assert@^1",
     "@std/io": "jsr:@std/io@^0.225",

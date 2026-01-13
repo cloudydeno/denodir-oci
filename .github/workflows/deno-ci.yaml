@@ -60,7 +60,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ~/.cache/deno
-        key: denodir/${{ matrix.deno-version }}-${{ hashFiles('deno.lock') }}
+        key: denodir-${{ hashFiles('deno.lock') }}
 
     - name: Publish now
       run: deno publish
