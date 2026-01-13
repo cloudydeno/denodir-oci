@@ -1,7 +1,7 @@
 {
   "version": "5",
   "specifiers": {
-    "jsr:@cloudydeno/bitesized@1": "1.0.4",
+    "jsr:@cloudydeno/bitesized@^1.0.4": "1.0.4",
     "jsr:@cloudydeno/docker-registry-client@0.7": "0.7.0",
     "jsr:@cloudydeno/oci-toolkit@0.4": "0.4.0",
     "jsr:@cloudydeno/stream-observables@^1.5.0": "1.5.0",
@@ -136,7 +136,7 @@
   },
   "workspace": {
     "dependencies": [
-      "jsr:@cloudydeno/bitesized@1",
+      "jsr:@cloudydeno/bitesized@^1.0.4",
       "jsr:@cloudydeno/docker-registry-client@0.7",
       "jsr:@cloudydeno/oci-toolkit@0.4",
       "jsr:@cloudydeno/stream-observables@^1.5.0",
