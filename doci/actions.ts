@@ -1,10 +1,10 @@
 
-import { exportArtifactAsArchive, extractTarArchive, newStackedStore, type OciStoreApi, pullFullArtifact, StackedStore } from "@cloudydeno/oci-toolkit";
+import { exportArtifactAsArchive, extractTarArchive, newStackedStore, type OciStoreApi, pullFullArtifact, type StackedStore } from "@cloudydeno/oci-toolkit";
 import { BuildContext, type DociLayer } from "../lib/build.ts";
 import { ejectToImage } from "../lib/eject-to-image.ts";
 import type { DenodirArtifactConfig } from "../lib/types.ts";
 import { renderImportmapFlag } from "../lib/util/importmap.ts";
-import { type ManifestOCI, type ManifestOCIDescriptor, parseRepoAndRef } from "@cloudydeno/docker-registry-client";
+import { type ByteArray, type ManifestOCI, type ManifestOCIDescriptor, parseRepoAndRef } from "@cloudydeno/docker-registry-client";
 import { join as joinPath } from "@std/path";
 
 /**
@@ -191,7 +191,7 @@ export async function exportTarArchive(opts: {
   baseRef: string | null;
   targetRef: string;
   format: 'oci' | 'docker' | 'auto';
-}): Promise<ReadableStream<Uint8Array>> {
+}): Promise<ReadableStream<ByteArray>> {
 
   if (!opts.baseRef) {
     console.error(`Exporting to archive...`, opts.digest);

@@ -1,6 +1,7 @@
 import type {
   ManifestOCIDescriptor,
   ManifestOCI,
+  ByteArray,
 } from "@cloudydeno/docker-registry-client";
 import type {
   ModuleGraphJson,
@@ -24,7 +25,7 @@ import {
 } from "@cloudydeno/oci-toolkit";
 import {
   map,
-} from "@cloudydeno/stream-observables/transforms/map.ts";
+} from "@cloudydeno/stream-observables/transforms/map";
 
   // assertEquals,
   // Tar,
@@ -503,8 +504,8 @@ export async function buildDenodirLayer(opts: {
  * render @ https://mermaid.live
  */
  export async function digestAndCompressAndDigestAndStore(
-  sourceData: ReadableStream<Uint8Array>,
-  targetStream: WritableStream<Uint8Array>,
+  sourceData: ReadableStream<ByteArray>,
+  targetStream: WritableStream<ByteArray>,
 ) {
   const [rawLeft, rawRight] = sourceData.tee();
   const uncompressedHashPromise = sha256stream(rawLeft);
