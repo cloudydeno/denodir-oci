@@ -26,7 +26,7 @@
     "jsr:@std/tar@~0.1.9": "0.1.9",
     "jsr:@std/yaml@1": "1.0.10",
     "jsr:@zaubrik/djwt@3": "3.0.2",
-    "npm:komando@1": "1.0.3"
+    "npm:komando@^1.0.3": "1.0.3"
   },
   "jsr": {
     "@cloudydeno/bitesized@1.0.4": {
@@ -147,7 +147,7 @@
       "jsr:@std/streams@1",
       "jsr:@std/tar@0.1",
       "jsr:@std/yaml@1",
-      "npm:komando@1"
+      "npm:komando@^1.0.3"
     ]
   }
 }
