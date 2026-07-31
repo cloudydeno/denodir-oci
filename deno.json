@@ -13,7 +13,7 @@
     "@std/streams": "jsr:@std/streams@^1",
     "@std/tar": "jsr:@std/tar@^0.1",
     "@std/yaml": "jsr:@std/yaml@^1",
-    "komando": "npm:komando@^1"
+    "komando": "npm:komando@^1.0.3"
   },
   "exports": {
     ".": "./doci/actions.ts",
