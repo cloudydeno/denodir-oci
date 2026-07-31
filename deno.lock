@@ -7,7 +7,7 @@
     "jsr:@cloudydeno/opentelemetry@0.11": "0.11.1",
     "jsr:@cloudydeno/stream-observables@^1.5.0": "1.5.0",
     "jsr:@deno-library/progress@^1.5.1": "1.5.1",
-    "jsr:@deno/graph@0.105": "0.105.0",
+    "jsr:@deno/graph@~0.110.2": "0.110.2",
     "jsr:@std/assert@1": "1.0.19",
     "jsr:@std/assert@^1.0.16": "1.0.19",
     "jsr:@std/bytes@^1.0.6": "1.0.6",
@@ -70,8 +70,8 @@
         "jsr:@std/io@0.225.0"
       ]
     },
-    "@deno/graph@0.105.0": {
-      "integrity": "0bc45ad64acfff66ae8b9536d185559804e867b36b210c4b4d1924adcc8aacd7"
+    "@deno/graph@0.110.2": {
+      "integrity": "9ebc8a4451969ae2650f09da3ea7371dff42f703d68eb3993811ecb814d51995"
     },
     "@std/assert@1.0.19": {
       "integrity": "eaada96ee120cb980bc47e040f82814d786fe8162ecc53c91d8df60b8755991e",
@@ -145,7 +145,7 @@
       "jsr:@cloudydeno/docker-registry-client@0.7",
       "jsr:@cloudydeno/oci-toolkit@0.4",
       "jsr:@cloudydeno/stream-observables@^1.5.0",
-      "jsr:@deno/graph@0.105",
+      "jsr:@deno/graph@~0.110.2",
       "jsr:@std/assert@1",
       "jsr:@std/io@0.225",
       "jsr:@std/path@1",
