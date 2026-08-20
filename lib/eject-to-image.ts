@@ -66,8 +66,9 @@ export async function ejectToImage(opts: {
   const configWriter = new ImageConfigWriter(baseConfig, `cloudydeno.denodir-oci.v0`);
 
   const knownDenodir = configWriter.getEnv('DENO_DIR');
-  if (knownDenodir !== '/denodir') {
-    configWriter.setEnv(`DENO_DIR`, `/denodir`);
+  // This particular value is aligned with denoland/deno Docker images
+  if (knownDenodir !== '/deno-dir/') {
+    configWriter.setEnv(`DENO_DIR`, `/deno-dir/`);
   }
 
   // Add the DOCI layers to the Docker config
@@ -75,7 +76,7 @@ export async function ejectToImage(opts: {
     const diffDigest = layer.annotations?.['uncompressed-digest']
       ?? await getUncompressedDigest(opts.store, layer.digest);
     const briefSpecifier = layer.annotations?.['specifier']
-      .replace('file:///denodir/deps/file/', '');
+      .replace('file:///deno-dir/deps/file/', '');
 
     configWriter.recordDiffLayer({
       command: `RUN deno cache ${briefSpecifier ?? '[...]'}`,

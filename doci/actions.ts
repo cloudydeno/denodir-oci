@@ -124,7 +124,7 @@ export async function runArtifact(opts: {
     }
 
     let entrypoint = configData.entrypoint;
-    if (entrypoint.startsWith('file:///denodir/')) {
+    if (entrypoint.startsWith('file:///deno-dir/')) {
       entrypoint = entrypoint.replace('file://', tempDir);
     }
 

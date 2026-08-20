@@ -204,7 +204,7 @@ export async function buildDenodirLayer(opts: {
     return {
       virtualPath: newPath,
       virtualSpecifier: toFileUrl(parsePath(rootPath).root + newPath).toString(),
-      genPath: 'denodir/gen/file/'+newPath,
+      genPath: 'deno-dir/gen/file/'+newPath,
     };
   }
 
@@ -249,7 +249,7 @@ export async function buildDenodirLayer(opts: {
       const exists = await Deno.stat(file).then(() => true, () => false);
       if (!exists) continue;
       tarEntries.push({
-        name: 'denodir/deps/file/'+file,
+        name: 'deno-dir/deps/file/'+file,
         filePath: file,
         // mtime: 0,
       });
@@ -270,7 +270,7 @@ export async function buildDenodirLayer(opts: {
     addedPaths.add(cachePath);
 
     tarEntries.push({
-      name: 'denodir/'+cachePath.slice(prefixLength),
+      name: 'deno-dir/'+cachePath.slice(prefixLength),
       filePath: cachePath,
       // ...await cleanDepsMeta(cachePath),
       // mtime: 0,
@@ -313,7 +313,7 @@ export async function buildDenodirLayer(opts: {
       if (!layer.storedSpecifiers.has(registrySpeci)) {
         layer.storedSpecifiers.add(registrySpeci);
         tarEntries.push({
-          name: `denodir/npm/registry.npmjs.org/${pkgName}/registry.json`,
+          name: `deno-dir/npm/registry.npmjs.org/${pkgName}/registry.json`,
           filePath: `${srcDir}/${pkgName}/registry.json`,
         });
       }
@@ -333,7 +333,7 @@ export async function buildDenodirLayer(opts: {
       const files = new TextDecoder().decode(findOutput.stdout).trimEnd().split('\n');
       for (const file of files) {
         tarEntries.push({
-          name: `denodir/npm/registry.npmjs.org/${file}`,
+          name: `deno-dir/npm/registry.npmjs.org/${file}`,
           filePath: `${srcDir}/${file}`,
         });
       }
@@ -349,7 +349,7 @@ export async function buildDenodirLayer(opts: {
     if (module.local.startsWith(prefix)) {
       // TODO: clean the metadata - the gen metadata is a set of complex deno hashes
       tarEntries.push({
-        name: 'denodir/'+module.local.slice(prefixLength),
+        name: 'deno-dir/'+module.local.slice(prefixLength),
         filePath: module.local,
         // ...await cleanDepsMeta(module.local),
         // mtime: 0,
@@ -358,15 +358,15 @@ export async function buildDenodirLayer(opts: {
         const genSubpath = module.local.slice(prefixLength).replace(/^remote/, 'gen')+'.js';
         if (prefix+genSubpath == module.local) throw new Error(`failed to get gen path for ${genSubpath}`);
         tarEntries.push({
-          name: 'denodir/'+genSubpath,
+          name: 'deno-dir/'+genSubpath,
           filePath: prefix+genSubpath,
           // ...await cleanDepsMeta(prefix+genSubpath),
           // mtime: 0,
         });
       }
     } else if (module.specifier.startsWith('file://')) {
-      // Move file:// modules into /denodir/deps/file/
-      // TODO: consider rewriting file://... modules underneath https://denodir/ ?
+      // Move file:// modules into /deno-dir/deps/file/
+      // TODO: consider rewriting file://... modules underneath https://deno-dir/ ?
 
       // const rootPath = module.local.slice(1);
       // if (!opts.localFileRoot || !rootPath.startsWith(opts.localFileRoot)) throw new Error(
@@ -391,7 +391,7 @@ export async function buildDenodirLayer(opts: {
     // if (module.emit) {
     //   throw new Error(`TODO: what does module.emit mean in Deno 2?`);
       // assert(module.emit.startsWith(prefix));
-      // const emitPath = emitPathRemap ?? `denodir/${module.emit.slice(prefixLength).replace(/\.[^.]+$/, '')}`;
+      // const emitPath = emitPathRemap ?? `deno-dir/${module.emit.slice(prefixLength).replace(/\.[^.]+$/, '')}`;
       // const emitExt = path.extname(module.emit);
 
       // await tarEntries.push({
