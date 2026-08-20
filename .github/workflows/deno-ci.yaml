@@ -29,12 +29,7 @@ jobs:
       uses: denoland/setup-deno@v2
       with:
         deno-version: ${{ matrix.deno-version }}
-
-    - name: Cache Deno data
-      uses: actions/cache@v6
-      with:
-        path: ~/.cache/deno
-        key: denodir/${{ matrix.deno-version }}-${{ hashFiles('deno.lock') }}
+        cache: true
 
     - name: Check deno.lock
       run: deno install --frozen
@@ -55,12 +50,8 @@ jobs:
     - uses: actions/checkout@v7
 
     - uses: denoland/setup-deno@v2
-
-    - name: Cache Deno data
-      uses: actions/cache@v6
       with:
-        path: ~/.cache/deno
-        key: denodir-${{ hashFiles('deno.lock') }}
+        cache: true
 
     - name: Publish now
       run: deno publish

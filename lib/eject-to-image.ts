@@ -1,12 +1,17 @@
 
-import { Manifest, ManifestOCI, ManifestOCIIndex, MEDIATYPE_MANIFEST_LIST_V2, MEDIATYPE_MANIFEST_V2, MEDIATYPE_OCI_MANIFEST_INDEX_V1, MEDIATYPE_OCI_MANIFEST_V1 } from "@cloudydeno/docker-registry-client";
-import { stableJsonSerialize, OciImageConfig, ImageConfigWriter, sha256stream, OciStoreApi } from "@cloudydeno/oci-toolkit";
+import {
+  type Manifest, type ManifestOCI, type ManifestOCIDescriptor, type ManifestOCIIndex,
+  MEDIATYPE_MANIFEST_LIST_V2, MEDIATYPE_MANIFEST_V2, MEDIATYPE_OCI_MANIFEST_INDEX_V1, MEDIATYPE_OCI_MANIFEST_V1,
+} from "@cloudydeno/docker-registry-client";
+import { stableJsonSerialize, type OciImageConfig, ImageConfigWriter, sha256stream, type OciStoreApi } from "@cloudydeno/oci-toolkit";
 import type { DenodirArtifactConfig } from "./types.ts";
 import { renderImportmapFlag } from "./util/importmap.ts";
 
+type ManifestPlatform = ManifestOCIIndex['manifests'][number]['platform'];
+
 /**
  * Combine a base docker image with a denodir artifact
- * Results in a runnable image
+ * Results in a directly runnable container image
  * Tested with: Docker, podman, containerd
  */
 export async function ejectToImage(opts: {
@@ -14,7 +19,8 @@ export async function ejectToImage(opts: {
   baseDigest: string;
   dociDigest: string;
   annotations?: Record<string, string>;
-}) {
+  platformFilter?: (platform: ManifestPlatform) => boolean;
+}): Promise<ManifestOCIDescriptor> {
 
   const baseManifest: Manifest = JSON.parse(new TextDecoder().decode(await opts.store.getFullLayer('manifest', opts.baseDigest)));
 
@@ -22,17 +28,25 @@ export async function ejectToImage(opts: {
   if (baseManifest.mediaType == MEDIATYPE_OCI_MANIFEST_INDEX_V1
     || baseManifest.mediaType == MEDIATYPE_MANIFEST_LIST_V2) {
 
+    const ejectedManifests = await Promise.all((<ManifestOCIIndex>baseManifest).manifests
+      .filter(archManifest => archManifest.platform?.os !== 'unknown') // remove attestation-manifests
+      .filter(archManifest => opts.platformFilter?.(archManifest.platform) ?? true)
+      .map(archManifest =>
+        ejectToImage({ ...opts,
+          baseDigest: archManifest.digest,
+        }).then(ejected => ({ ...archManifest, ...ejected }))
+      ));
+
+    // We can skip making an index if there was only one image
+    if (ejectedManifests.length == 1) {
+      return ejectedManifests[0];
+    }
+
     const newList: ManifestOCIIndex = {
       schemaVersion: 2,
       mediaType: MEDIATYPE_OCI_MANIFEST_INDEX_V1,
       annotations: opts.annotations,
-      manifests: await Promise.all((<ManifestOCIIndex>baseManifest).manifests
-        .filter(archManifest => archManifest.platform?.os !== 'unknown') // remove attestation-manifests
-        .map(archManifest =>
-          ejectToImage({ ...opts,
-            baseDigest: archManifest.digest,
-          }).then(ejected => ({ ...archManifest, ...ejected }))
-        )),
+      manifests: ejectedManifests,
     };
 
     return await opts.store.putLayerFromBytes('manifest', {
