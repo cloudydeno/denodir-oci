@@ -318,11 +318,12 @@ export async function buildDenodirLayer(opts: {
         });
       }
 
-      const args = ['-type', 'f', `${pkgName}/${version}`];
+      const versionDir = `${pkgName}/${version.replace(/_$/, '')}`;
+      const args = ['-type', 'f', versionDir];
       console.error('  + find', args.join(' '));
       const findOutput = await new Deno.Command('find', {
         args: [
-          `${pkgName}/${version}`,
+          versionDir,
           '-type', 'f',
         ],
         cwd: srcDir,

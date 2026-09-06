@@ -18,7 +18,9 @@ jobs:
         deno-version:
         - v2.5
         - v2.6
-        - canary
+        - v2.7
+        - v2.8
+        - v2.9
       fail-fast: false # run each branch to completion
 
     steps:
