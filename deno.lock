@@ -22,12 +22,12 @@
     "jsr:@std/path@1": "1.1.6",
     "jsr:@std/path@^1.1.4": "1.1.6",
     "jsr:@std/path@^1.1.6": "1.1.6",
-    "jsr:@std/streams@^1.0.17": "1.1.2",
-    "jsr:@std/streams@^1.1.2": "1.1.2",
+    "jsr:@std/streams@^1.0.17": "1.2.0",
+    "jsr:@std/streams@^1.2.0": "1.2.0",
     "jsr:@std/tar@~0.1.10": "0.1.10",
     "jsr:@std/tar@~0.1.9": "0.1.10",
-    "jsr:@std/yaml@1": "1.2.0",
-    "jsr:@std/yaml@^1.2.0": "1.2.0",
+    "jsr:@std/yaml@1": "1.3.0",
+    "jsr:@std/yaml@^1.3.0": "1.3.0",
     "jsr:@zaubrik/djwt@3": "3.0.2",
     "npm:komando@^1.0.3": "1.0.3"
   },
@@ -114,8 +114,8 @@
         "jsr:@std/internal@^1.0.14"
       ]
     },
-    "@std/streams@1.1.2": {
-      "integrity": "0249bf9b78a999f57032ca4d8e7ccaa57579090242640b35ddc948fbb745d3af",
+    "@std/streams@1.2.0": {
+      "integrity": "256b934254778f2bf45f5713b934209ff29e9b4b7fd4ec095219966813758c5f",
       "dependencies": [
         "jsr:@std/bytes"
       ]
@@ -126,8 +126,8 @@
         "jsr:@std/streams@^1.0.17"
       ]
     },
-    "@std/yaml@1.2.0": {
-      "integrity": "20beb41e4983ba3437dbefac62b14061ab058e8a187596f19d28ff9035f6e6cf"
+    "@std/yaml@1.3.0": {
+      "integrity": "b250103854378b8b36cbff0fe95aec017d3d9ce86b489c67605180c602fb4922"
     },
     "@zaubrik/djwt@3.0.2": {
       "integrity": "8070adaa49cd9e5d2b8ae82fd461132c966ef2f8ff8378db4a4da8df4f17c664",
@@ -151,9 +151,9 @@
       "jsr:@std/assert@^1.0.19",
       "jsr:@std/io@~0.225.3",
       "jsr:@std/path@^1.1.6",
-      "jsr:@std/streams@^1.1.2",
+      "jsr:@std/streams@^1.2.0",
       "jsr:@std/tar@~0.1.10",
-      "jsr:@std/yaml@^1.2.0",
+      "jsr:@std/yaml@^1.3.0",
       "npm:komando@^1.0.3"
     ]
   }
